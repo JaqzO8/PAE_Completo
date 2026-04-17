@@ -1,0 +1,237 @@
+services:
+  # ========================================
+  # FRONTEND (Vite / SPA)
+  # ========================================
+  frontend:
+    build: ./frontend
+    container_name: pae-frontend
+    ports:
+      - "${FRONTEND_PORT}:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      VITE_API_URL: ${API_GATEWAY_URL}/api
+      VITE_USE_MOCKS: "false"
+    depends_on:
+      - nginx-gateway
+    networks:
+      - pae-network
+    restart: unless-stopped
+
+  # ========================================
+  # NGINX - API GATEWAY
+  # ========================================
+  nginx-gateway:
+    build: ./backend/nginx
+    container_name: pae-nginx-gateway
+    ports:
+      - "${NGINX_PORT}:3000"
+    depends_on:
+      - auth-service
+      - content-service
+      # - community-service   # ⛔ Comentado
+    networks:
+      - pae-network
+    restart: unless-stopped
+
+  # ========================================
+  # AUTH SERVICE
+  # ========================================
+  auth-service:
+    build: ./backend/services/auth-service
+    container_name: pae-auth-service
+    ports:
+      - "${AUTH_PORT}:3001"
+    env_file:
+      - .env
+    environment:
+      PORT: 3001
+      DB_HOST: ${AUTH_DB_HOST}
+      DB_PORT: ${AUTH_DB_PORT}
+      DB_NAME: ${AUTH_DB_NAME}
+      DB_USER: ${AUTH_DB_USER}
+      DB_PASSWORD: ${AUTH_DB_PASSWORD}
+      REDIS_URL: ${REDIS_URL}
+      FRONTEND_URL: ${FRONTEND_URL}
+    depends_on:
+      auth-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - pae-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3001/api/auth/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ========================================
+  # CONTENT SERVICE
+  # ========================================
+  content-service:
+    build: ./backend/services/content-service
+    container_name: pae-content-service
+    ports:
+      - "${CONTENT_PORT}:3003"
+    volumes:
+      - ./uploads:/app/uploads
+    env_file:
+      - .env
+    environment:
+      PORT: 3003
+      DB_HOST: ${CONTENT_DB_HOST}
+      DB_PORT: ${CONTENT_DB_PORT}
+      DB_NAME: ${CONTENT_DB_NAME}
+      DB_USER: ${CONTENT_DB_USER}
+      DB_PASSWORD: ${CONTENT_DB_PASSWORD}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+      FRONTEND_URL: ${FRONTEND_URL}
+      UPLOAD_PATH: /app/uploads
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE}
+    depends_on:
+      content-db:
+        condition: service_healthy
+    networks:
+      - pae-network
+    restart: unless-stopped
+    healthcheck: 
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3003/api/content/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ========================================
+  # COMMUNITY SERVICE
+  # ========================================
+  # community-service:
+  #   build: ./backend/services/community-service
+  #   container_name: pae-community-service
+  #   ports:
+  #     - "${COMMUNITY_PORT}:3002"
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     PORT: 3002
+  #     DB_HOST: ${COMMUNITY_DB_HOST}
+  #     DB_PORT: ${COMMUNITY_DB_PORT}
+  #     DB_NAME: ${COMMUNITY_DB_NAME}
+  #     DB_USER: ${COMMUNITY_DB_USER}
+  #     DB_PASSWORD: ${COMMUNITY_DB_PASSWORD}
+  #     REDIS_URL: ${REDIS_URL}
+  #     AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+  #     FRONTEND_URL: ${FRONTEND_URL}
+  #   depends_on:
+  #     - community-db
+  #     - redis
+  #   networks:
+  #     - pae-network
+
+  # ========================================
+  # AUTH DATABASE
+  # ========================================
+  auth-db:
+    image: postgres:15-alpine
+    container_name: pae-auth-db
+    ports:
+      - "${AUTH_DB_HOST_PORT}:5432"
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${AUTH_DB_NAME}
+      POSTGRES_USER: ${AUTH_DB_USER}
+      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD}
+    volumes:
+      - auth-db-data:/var/lib/postgresql/data
+      - ./database/auth-db/init:/docker-entrypoint-initdb.d
+    networks:
+      - pae-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AUTH_DB_USER} -d ${AUTH_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ========================================
+  # CONTENT DATABASE
+  # ========================================
+  content-db:
+    image: postgres:15-alpine
+    container_name: pae-content-db
+    ports:
+      - "${CONTENT_DB_HOST_PORT}:5432"
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${CONTENT_DB_NAME}
+      POSTGRES_USER: ${CONTENT_DB_USER}
+      POSTGRES_PASSWORD: ${CONTENT_DB_PASSWORD}
+    volumes:
+      - content-db-data:/var/lib/postgresql/data
+      - ./database/content-db/init:/docker-entrypoint-initdb.d
+    networks:
+      - pae-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${CONTENT_DB_USER} -d ${CONTENT_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ========================================
+  # COMMUNITY DATABASE
+  # ========================================
+  # community-db:
+  #   image: postgres:15-alpine
+  #   container_name: pae-community-db
+  #   ports:
+  #     - "${COMMUNITY_DB_HOST_PORT}:5432"
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     POSTGRES_DB: ${COMMUNITY_DB_NAME}
+  #     POSTGRES_USER: ${COMMUNITY_DB_USER}
+  #     POSTGRES_PASSWORD: ${COMMUNITY_DB_PASSWORD}
+  #   volumes:
+  #     - community-db-data:/var/lib/postgresql/data
+  #   networks:
+  #     - pae-network
+
+  # ========================================
+  # REDIS
+  # ========================================
+  redis:
+    image: redis:7-alpine
+    container_name: pae-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - pae-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+# ========================================
+# NETWORKS
+# ========================================
+networks:
+  pae-network:
+    driver: bridge
+
+# ========================================
+# VOLUMES
+# ========================================
+volumes:
+  auth-db-data:
+  content-db-data:
+  content-uploads:
+  # community-db-data   # ⛔ Comentado
