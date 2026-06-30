@@ -1,93 +1,63 @@
 const jwt = require('jsonwebtoken');
 const config = require('../config/env');
 
-/**
- * Middleware para verificar JWT token
- */
-const verifyToken = async (req, res, next) => {
-    try {
-        const authHeader = req.headers.authorization;
+const extractToken = (authHeader) => {
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return null;
+    }
 
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return res.status(401).json({
-                success: false,
-                message: 'Token no proporcionado',
-            });
-        }
+    return authHeader.substring(7);
+};
 
-        const token = authHeader.substring(7);
+const verifyToken = (req, res, next) => {
+    const token = extractToken(req.headers.authorization);
 
-        // Verificar el token
-        const decoded = jwt.verify(token, config.JWT_SECRET);
-
-        // Adjuntar datos del usuario a la request
-        req.user = {
-            id: decoded.id,
-            identificador_unico: decoded.identificador_unico,
-            email: decoded.email,
-            rol: decoded.rol,
-        };
-        req.token = token;
-        
-        next();
-    } catch (error) {
-        if (error.name === 'TokenExpiredError') {
-            return res.status(401).json({
-                success: false,
-                message: 'Token expirado',
-            });
-        }
-        if (error.name === 'JsonWebTokenError') {
-            return res.status(401).json({
-                success: false,
-                message: 'Token inválido',
-            });
-        }
-        return res.status(500).json({
+    if (!token) {
+        return res.status(401).json({
             success: false,
-            message: 'Error al verificar token',
+            message: 'Token no proporcionado',
+        });
+    }
+
+    try {
+        const decoded = jwt.verify(token, config.JWT_SECRET);
+        req.user = decoded;
+        req.token = token;
+        return next();
+    } catch (error) {
+        return res.status(401).json({
+            success: false,
+            message: error.name === 'TokenExpiredError' ? 'Token expirado' : 'Token invalido',
         });
     }
 };
 
-/**
- * Middleware para verificar roles
- */
-const verifyRole = (...allowedRoles) => {
-    return (req, res, next) => {
-        if (!req.user || !req.user.rol) {
-            return res.status(403).json({
-                success: false,
-                message: 'Acceso denegado',
-            });
-        }
+const isAuthenticated = (req, res, next) => {
+    if (!req.user?.id) {
+        return res.status(401).json({
+            success: false,
+            message: 'Usuario no autenticado',
+        });
+    }
 
-        if (!allowedRoles.includes(req.user.rol)) {
-            return res.status(403).json({
-                success: false,
-                message: 'No tienes permisos para acceder a este recurso',
-                requiredRole: allowedRoles,
-                yourRole: req.user.rol,
-            });
-        }
-
-        next();
-    };
+    return next();
 };
 
-/**
- * Middleware para verificar que sea docente
- */
-const isTeacher = verifyRole('docente', 'admin');
+const isTeacher = (req, res, next) => {
+    const role = req.user?.rol;
 
-/**
- * Middleware para verificar que sea estudiante o docente
- */
-const isAuthenticated = verifyRole('estudiante', 'docente', 'admin');
+    if (role !== 'docente' && role !== 'admin') {
+        return res.status(403).json({
+            success: false,
+            message: 'Se requieren permisos de docente',
+        });
+    }
+
+    return next();
+};
 
 module.exports = {
     verifyToken,
-    verifyRole,
-    isTeacher,
     isAuthenticated,
+    isTeacher,
 };

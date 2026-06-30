@@ -76,13 +76,13 @@ const Login = () => {
 
         <p className="px-8 text-center text-xs text-muted-foreground">
           Al continuar, aceptas nuestros{" "}
-          <a href="#" className="underline hover:text-brand-action">
+          <Link to="/terminos" className="underline hover:text-brand-action">
             Términos de Servicio
-          </a>{" "}
+          </Link>{" "}
           y{" "}
-          <a href="#" className="underline hover:text-brand-action">
+          <Link to="/privacidad" className="underline hover:text-brand-action">
             Política de Privacidad
-          </a>.
+          </Link>.
         </p>
       </div>
     </div>

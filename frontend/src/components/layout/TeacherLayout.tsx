@@ -19,7 +19,8 @@ import { BRAND_CONFIG } from "../../config/brandConfig";
 import { 
   TEACHER_MAIN_MENU, 
   REPO_MENU_TEACHER, 
-  GROUPS_MENU_TEACHER 
+  GROUPS_MENU_TEACHER,
+  LEARNING_MENU_TEACHER,
 } from "../../config/menus";
 
 interface Props {
@@ -50,6 +51,12 @@ export const TeacherLayout = ({ children }: Props) => {
   else if (pathname.startsWith("/docente/repositorios")) {
     currentMenu = REPO_MENU_TEACHER;
     sidebarTitle = "Repositorio";
+    backRoute = "/docente";
+  }
+
+  else if (pathname.startsWith("/docente/aprendizaje")) {
+    currentMenu = LEARNING_MENU_TEACHER;
+    sidebarTitle = "Aprendizaje";
     backRoute = "/docente";
   }
 

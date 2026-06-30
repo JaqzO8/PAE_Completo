@@ -1,5 +1,11 @@
 // src/features/learning/services/learningService.ts
 import { api } from "../../../services/api";
+import {
+  getOfflineAttempts,
+  markOfflineAttemptTried,
+  queueOfflineAttempt,
+  removeOfflineAttempt,
+} from "./offlineAttempts";
 
 // ========== INTERFACES ==========
 export interface University {
@@ -22,6 +28,7 @@ export interface SimulacroQuestion {
   explanation: string;
   subject: string;
   difficulty: "facil" | "medio" | "dificil";
+  type?: "opcion_multiple" | "abierta";
 }
 
 export interface SimulacroResult {
@@ -33,7 +40,7 @@ export interface SimulacroResult {
 
 export interface SimulacroSubmission {
   simulacroId: string;
-  answers: number[];
+  answers: Array<number | string>;
   timeSpent: number;
 }
 
@@ -43,11 +50,102 @@ export interface SimulacroScore {
   correctAnswers: number;
   timeSpent: number;
   percentile: number;
+  requiresManualReview?: boolean;
+  offlinePending?: boolean;
+  offlineAttemptId?: string;
+  newAchievements?: LearningAchievement[];
+  gamification?: GamificationSummary;
   solutions: Array<{
     question: SimulacroQuestion;
-    userAnswer: number;
+    userAnswer: number | string;
     isCorrect: boolean;
+    requiresManualReview?: boolean;
   }>;
+}
+
+export interface LearningAchievement {
+  id: string;
+  code: string;
+  title: string;
+  description: string;
+  icon: string;
+  points: number;
+  earnedAt: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface LearningNotification {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  read: boolean;
+  emailPending: boolean;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface GamificationSettings {
+  attemptCompletedPoints: number;
+  highAccuracyBonusPoints: number;
+  highAccuracyThreshold: number;
+  livePointsRatio: number;
+  onboardingStepPoints: number;
+  baseLevelPoints: number;
+  levelPointsIncrement: number;
+  leaderboardLimit: number;
+  onboardingSteps: Array<{
+    id: string;
+    title: string;
+    description: string;
+    route: string;
+  }>;
+}
+
+export interface GamificationSummary {
+  profile: {
+    userId: string;
+    displayName: string;
+    role: string;
+    totalPoints: number;
+    level: number;
+    streakDays: number;
+    lastActivity?: string | null;
+    levelProgress: {
+      level: number;
+      currentLevelStart: number;
+      nextLevelAt: number;
+      progressPercent: number;
+    };
+  };
+  achievements: LearningAchievement[];
+  onboarding: Array<{
+    id: string;
+    title: string;
+    description: string;
+    route: string;
+    completed: boolean;
+    points: number;
+  }>;
+  recentEvents: Array<{
+    id: string;
+    type: string;
+    points: number;
+    description: string;
+    metadata?: Record<string, unknown>;
+    createdAt: string;
+  }>;
+  newEventsCount?: number;
+}
+
+export interface GamificationLeaderboardItem {
+  rank: number;
+  userId: string;
+  displayName: string;
+  role: string;
+  totalPoints: number;
+  level: number;
+  lastActivity?: string | null;
 }
 
 export interface ChallengeRoom {
@@ -60,12 +158,58 @@ export interface ChallengeRoom {
   maxPlayers: number;
   status: "waiting" | "playing" | "finished";
   createdAt: string;
+  participants?: Array<{ id: string; name: string; joinedAt: string }>;
 }
 
 export interface CreateRoomData {
   topic: string;
   difficulty: "facil" | "medio" | "dificil";
   maxPlayers: number;
+}
+
+export interface LiveChallengeQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  subject: string;
+  difficulty: "facil" | "medio" | "dificil";
+}
+
+export interface LiveChallengeScore {
+  id: string;
+  name: string;
+  score: number;
+  correctAnswers: number;
+  answered: number;
+}
+
+export interface LiveChallengeGame {
+  id: string;
+  room: ChallengeRoom;
+  status: "waiting" | "playing" | "finished";
+  currentQuestionIndex: number;
+  totalQuestions: number;
+  timePerQuestion: number;
+  questionStartedAt?: string;
+  currentQuestion: LiveChallengeQuestion | null;
+  scoreboard: LiveChallengeScore[];
+  answersCount: number;
+  expectedAnswers: number;
+  lastAnswer?: {
+    questionId: string;
+    userId: string;
+    userName: string;
+    answer: number;
+    correct: boolean;
+    points: number;
+    responseMs: number;
+    answeredAt: string;
+  };
+  gamification?: {
+    pointsAwarded: number;
+    totalPoints: number;
+    level: number;
+  } | null;
 }
 
 export interface TriviaQuestion {
@@ -87,12 +231,110 @@ export interface TriviaRoom {
   maxPlayers: number;
   status: "waiting" | "playing" | "finished";
   createdAt: string;
+  participants?: Array<{ id: string; name: string; joinedAt: string }>;
 }
 
 export interface CreateTriviaRoomData {
   topic: string;
   questionsCount: number;
   maxPlayers: number;
+}
+
+export interface LiveTriviaGame {
+  id: string;
+  room: TriviaRoom;
+  status: "waiting" | "playing" | "finished";
+  currentQuestionIndex: number;
+  totalQuestions: number;
+  timePerQuestion: number;
+  questionStartedAt?: string;
+  currentQuestion: LiveChallengeQuestion | null;
+  scoreboard: LiveChallengeScore[];
+  answersCount: number;
+  expectedAnswers: number;
+  lastAnswer?: {
+    questionId: string;
+    userId: string;
+    userName: string;
+    answer: number;
+    correct: boolean;
+    points: number;
+    responseMs: number;
+    answeredAt: string;
+  };
+  gamification?: {
+    pointsAwarded: number;
+    totalPoints: number;
+    level: number;
+  } | null;
+}
+
+export interface BankQuestion {
+  id_pregunta?: number;
+  materia: string;
+  tema?: string;
+  dificultad: "facil" | "medio" | "dificil";
+  tipo: "opcion_multiple" | "abierta";
+  enunciado: string;
+  opciones: string[];
+  respuesta_correcta?: number;
+  respuesta_texto?: string;
+  explicacion?: string;
+  etiquetas?: string[];
+  universidad?: { slug: string; nombre: string };
+}
+
+export interface SavedQuestionItem {
+  id_guardado: number;
+  id_pregunta: number;
+  created_at: string;
+  pregunta: BankQuestion;
+}
+
+export interface CreateQuestionData {
+  universityId?: string;
+  materia: string;
+  tema?: string;
+  dificultad: "facil" | "medio" | "dificil";
+  tipo: "opcion_multiple" | "abierta";
+  enunciado: string;
+  opciones: string[];
+  respuesta_correcta?: number;
+  respuesta_texto?: string;
+  explicacion?: string;
+  etiquetas?: string[];
+}
+
+export interface OpenAnswerReview {
+  id_revision: number;
+  id_intento: number;
+  id_pregunta: number;
+  id_estudiante: number;
+  id_docente?: number;
+  respuesta_texto: string;
+  puntaje?: number;
+  feedback?: string;
+  estado: "pendiente" | "revisado";
+  fecha_revision?: string;
+  created_at: string;
+  intento?: {
+    id_intento: number;
+    dificultad: string;
+    puntaje?: number;
+    correctas?: number;
+    total_preguntas?: number;
+    fecha_fin?: string;
+    universidad?: string;
+  };
+  pregunta?: {
+    id_pregunta: number;
+    materia: string;
+    tema?: string;
+    dificultad: string;
+    enunciado: string;
+    respuesta_texto?: string;
+    explicacion?: string;
+  };
 }
 
 // ========== MOCK DATA ==========
@@ -373,6 +615,8 @@ const submitSimulacroApi = async (submission: SimulacroSubmission): Promise<Simu
   return response.data;
 };
 
+const isOfflineSubmissionError = (error: any) => !navigator.onLine || !error?.response;
+
 const getChallengeRoomsApi = async (): Promise<ChallengeRoom[]> => {
   const response = await api.get("/learning/challenges/rooms");
   return response.data;
@@ -383,9 +627,82 @@ const createChallengeRoomApi = async (data: CreateRoomData): Promise<ChallengeRo
   return response.data;
 };
 
+const joinChallengeRoomApi = async (roomId: string): Promise<ChallengeRoom> => {
+  const response = await api.post(`/learning/challenges/rooms/${roomId}/join`);
+  return response.data;
+};
+
+const leaveChallengeRoomApi = async (roomId: string): Promise<ChallengeRoom> => {
+  const response = await api.post(`/learning/challenges/rooms/${roomId}/leave`);
+  return response.data;
+};
+
+const getChallengeMatchApi = async (roomId: string): Promise<LiveChallengeGame> => {
+  const response = await api.get(`/learning/challenges/rooms/${roomId}/match`);
+  return response.data;
+};
+
+const startChallengeMatchApi = async (roomId: string): Promise<LiveChallengeGame> => {
+  const response = await api.post(`/learning/challenges/rooms/${roomId}/match/start`);
+  return response.data;
+};
+
+const answerChallengeQuestionApi = async (
+  roomId: string,
+  questionId: string,
+  answer: number
+): Promise<LiveChallengeGame> => {
+  const response = await api.post(`/learning/challenges/rooms/${roomId}/match/answer`, { questionId, answer });
+  return response.data;
+};
+
+const nextChallengeQuestionApi = async (roomId: string): Promise<LiveChallengeGame> => {
+  const response = await api.post(`/learning/challenges/rooms/${roomId}/match/next`);
+  return response.data;
+};
+
 const getDailyTriviaApi = async (): Promise<TriviaQuestion[]> => {
   const response = await api.get("/learning/trivia/daily");
   return response.data;
+};
+
+const getAchievementsApi = async (): Promise<LearningAchievement[]> => {
+  const response = await api.get("/learning/achievements");
+  return response.data.data;
+};
+
+const getLearningNotificationsApi = async (): Promise<LearningNotification[]> => {
+  const response = await api.get("/learning/notifications");
+  return response.data.data;
+};
+
+const markLearningNotificationReadApi = async (notificationId: string): Promise<void> => {
+  await api.patch(`/learning/notifications/${notificationId}/read`);
+};
+
+const getGamificationSummaryApi = async (): Promise<GamificationSummary> => {
+  const response = await api.get("/learning/gamification/summary");
+  return response.data.data;
+};
+
+const getGamificationLeaderboardApi = async (limit?: number): Promise<GamificationLeaderboardItem[]> => {
+  const response = await api.get("/learning/gamification/leaderboard", { params: { limit } });
+  return response.data.data;
+};
+
+const completeOnboardingStepApi = async (stepId: string): Promise<GamificationSummary> => {
+  const response = await api.post(`/learning/gamification/onboarding/${stepId}/complete`);
+  return response.data.data;
+};
+
+const getGamificationSettingsApi = async (): Promise<GamificationSettings> => {
+  const response = await api.get("/learning/gamification/settings");
+  return response.data.data;
+};
+
+const updateGamificationSettingsApi = async (settings: Partial<GamificationSettings>): Promise<GamificationSettings> => {
+  const response = await api.put("/learning/gamification/settings", settings);
+  return response.data.data;
 };
 
 const getTriviaRoomsApi = async (): Promise<TriviaRoom[]> => {
@@ -395,6 +712,35 @@ const getTriviaRoomsApi = async (): Promise<TriviaRoom[]> => {
 
 const createTriviaRoomApi = async (data: CreateTriviaRoomData): Promise<TriviaRoom> => {
   const response = await api.post("/learning/trivia/rooms", data);
+  return response.data;
+};
+
+const joinTriviaRoomApi = async (roomId: string): Promise<TriviaRoom> => {
+  const response = await api.post(`/learning/trivia/rooms/${roomId}/join`);
+  return response.data;
+};
+
+const getTriviaMatchApi = async (roomId: string): Promise<LiveTriviaGame> => {
+  const response = await api.get(`/learning/trivia/rooms/${roomId}/match`);
+  return response.data;
+};
+
+const startTriviaMatchApi = async (roomId: string): Promise<LiveTriviaGame> => {
+  const response = await api.post(`/learning/trivia/rooms/${roomId}/match/start`);
+  return response.data;
+};
+
+const answerTriviaQuestionApi = async (
+  roomId: string,
+  questionId: string,
+  answer: number
+): Promise<LiveTriviaGame> => {
+  const response = await api.post(`/learning/trivia/rooms/${roomId}/match/answer`, { questionId, answer });
+  return response.data;
+};
+
+const nextTriviaQuestionApi = async (roomId: string): Promise<LiveTriviaGame> => {
+  const response = await api.post(`/learning/trivia/rooms/${roomId}/match/next`);
   return response.data;
 };
 
@@ -433,10 +779,61 @@ export const submitSimulacro = async (submission: SimulacroSubmission): Promise<
   try {
     return await submitSimulacroApi(submission);
   } catch (error) {
+    if (isOfflineSubmissionError(error)) {
+      const queued = await queueOfflineAttempt(submission);
+      return {
+        score: 0,
+        totalQuestions: submission.answers.length,
+        correctAnswers: 0,
+        timeSpent: submission.timeSpent,
+        percentile: 0,
+        offlinePending: true,
+        offlineAttemptId: queued.id,
+        solutions: [],
+      };
+    }
     console.warn("🔴 API Error (Submit Simulacro), using mock.", error);
     return submitSimulacroMock(submission);
   }
 };
+
+export const syncOfflineAttempts = async () => {
+  const queued = await getOfflineAttempts();
+  const synced: string[] = [];
+
+  for (const item of queued) {
+    try {
+      await submitSimulacroApi(item.submission);
+      await removeOfflineAttempt(item.id);
+      synced.push(item.id);
+    } catch (error: any) {
+      await markOfflineAttemptTried(item.id);
+      if (!isOfflineSubmissionError(error) && error?.response?.status === 409) {
+        await removeOfflineAttempt(item.id);
+      }
+    }
+  }
+
+  return synced;
+};
+
+export const getAchievements = async (): Promise<LearningAchievement[]> => {
+  return getAchievementsApi();
+};
+
+export const getLearningNotifications = async (): Promise<LearningNotification[]> => {
+  return getLearningNotificationsApi();
+};
+
+export const markLearningNotificationRead = async (notificationId: string): Promise<void> => {
+  await markLearningNotificationReadApi(notificationId);
+};
+
+export const getGamificationSummary = getGamificationSummaryApi;
+export const getGamificationLeaderboard = getGamificationLeaderboardApi;
+export const completeOnboardingStep = completeOnboardingStepApi;
+export const getGamificationSettings = getGamificationSettingsApi;
+export const updateGamificationSettings = updateGamificationSettingsApi;
 
 export const getChallengeRooms = async (): Promise<ChallengeRoom[]> => {
   if (import.meta.env.VITE_USE_MOCKS === "true") {
@@ -462,6 +859,34 @@ export const createChallengeRoom = async (data: CreateRoomData): Promise<Challen
     console.warn("🔴 API Error (Create Challenge Room), using mock.", error);
     return createChallengeRoomMock(data);
   }
+};
+
+export const joinChallengeRoom = async (roomId: string): Promise<ChallengeRoom> => {
+  return joinChallengeRoomApi(roomId);
+};
+
+export const leaveChallengeRoom = async (roomId: string): Promise<ChallengeRoom> => {
+  return leaveChallengeRoomApi(roomId);
+};
+
+export const getChallengeMatch = async (roomId: string): Promise<LiveChallengeGame> => {
+  return getChallengeMatchApi(roomId);
+};
+
+export const startChallengeMatch = async (roomId: string): Promise<LiveChallengeGame> => {
+  return startChallengeMatchApi(roomId);
+};
+
+export const answerChallengeQuestion = async (
+  roomId: string,
+  questionId: string,
+  answer: number
+): Promise<LiveChallengeGame> => {
+  return answerChallengeQuestionApi(roomId, questionId, answer);
+};
+
+export const nextChallengeQuestion = async (roomId: string): Promise<LiveChallengeGame> => {
+  return nextChallengeQuestionApi(roomId);
 };
 
 export const getDailyTrivia = async (): Promise<TriviaQuestion[]> => {
@@ -501,4 +926,91 @@ export const createTriviaRoom = async (data: CreateTriviaRoomData): Promise<Triv
     console.warn("🔴 API Error (Create Trivia Room), using mock.", error);
     return createTriviaRoomMock(data);
   }
+};
+
+export const joinTriviaRoom = async (roomId: string): Promise<TriviaRoom> => {
+  return joinTriviaRoomApi(roomId);
+};
+
+export const getTriviaMatch = async (roomId: string): Promise<LiveTriviaGame> => {
+  return getTriviaMatchApi(roomId);
+};
+
+export const startTriviaMatch = async (roomId: string): Promise<LiveTriviaGame> => {
+  return startTriviaMatchApi(roomId);
+};
+
+export const answerTriviaQuestion = async (
+  roomId: string,
+  questionId: string,
+  answer: number
+): Promise<LiveTriviaGame> => {
+  return answerTriviaQuestionApi(roomId, questionId, answer);
+};
+
+export const nextTriviaQuestion = async (roomId: string): Promise<LiveTriviaGame> => {
+  return nextTriviaQuestionApi(roomId);
+};
+
+export const getQuestionBank = async (params?: {
+  search?: string;
+  materia?: string;
+  dificultad?: string;
+  universidad?: string;
+}): Promise<BankQuestion[]> => {
+  const response = await api.get("/learning/questions", { params });
+  return response.data.data;
+};
+
+export const getSavedQuestions = async (): Promise<SavedQuestionItem[]> => {
+  const response = await api.get("/learning/questions/saved");
+  return response.data.data;
+};
+
+export const saveQuestion = async (questionId: string | number): Promise<SavedQuestionItem> => {
+  const response = await api.post(`/learning/questions/${questionId}/save`);
+  return response.data.data;
+};
+
+export const deleteSavedQuestion = async (questionId: string | number): Promise<void> => {
+  await api.delete(`/learning/questions/${questionId}/save`);
+};
+
+export const createQuestion = async (data: CreateQuestionData): Promise<BankQuestion> => {
+  const response = await api.post("/learning/questions", data);
+  return response.data.data;
+};
+
+export const importQuestions = async (questions: CreateQuestionData[]): Promise<BankQuestion[]> => {
+  const response = await api.post("/learning/questions/import", { questions });
+  return response.data.data;
+};
+
+export const exportQuestions = async () => {
+  const response = await api.get("/learning/questions/export", {
+    responseType: "blob",
+  });
+
+  const blobUrl = window.URL.createObjectURL(response.data);
+  const link = document.createElement("a");
+  link.href = blobUrl;
+  link.download = "banco-preguntas-pae.json";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(blobUrl);
+};
+
+export const getOpenAnswerReviews = async (estado: "pendiente" | "revisado" | "all" = "pendiente"): Promise<OpenAnswerReview[]> => {
+  const response = await api.get("/learning/reviews/open", { params: { estado } });
+  return response.data.data;
+};
+
+export const reviewOpenAnswer = async (
+  attemptId: number,
+  questionId: number,
+  data: { puntaje: number; feedback?: string }
+): Promise<OpenAnswerReview> => {
+  const response = await api.post(`/learning/reviews/${attemptId}/questions/${questionId}`, data);
+  return response.data.data.review;
 };

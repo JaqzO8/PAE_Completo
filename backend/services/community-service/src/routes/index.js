@@ -8,9 +8,30 @@ const resourceRoutes = require('./resourceRoutes');
 const ChallengeController = require('../controllers/challengeController');
 const InvitationController = require('../controllers/invitationController');
 const FriendshipController = require('../controllers/friendshipController');
+const CommunityHubController = require('../controllers/communityHubController');
 
 const { verifyToken } = require('../middlewares/authMiddleware');
 const { verifyRole, verifyTeacherOfCommunity } = require('../middlewares/roleMiddleware');
+
+router.get('/health', (req, res) => {
+    res.status(200).json({
+        success: true,
+        service: 'community-service',
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+    });
+});
+
+/*
+|--------------------------------------------------------------------------
+| Community wellbeing, news and insights
+|--------------------------------------------------------------------------
+*/
+router.get('/hub', verifyToken, CommunityHubController.getHub);
+router.get('/news', verifyToken, CommunityHubController.getNews);
+router.get('/settings', verifyToken, verifyRole('docente', 'admin'), CommunityHubController.getSettings);
+router.put('/settings', verifyToken, verifyRole('docente', 'admin'), CommunityHubController.updateSettings);
+router.get('/:id/performance', verifyToken, CommunityHubController.getPerformance);
 
 /*
 |--------------------------------------------------------------------------

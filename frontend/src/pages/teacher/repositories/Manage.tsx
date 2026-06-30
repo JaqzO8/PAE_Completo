@@ -1,11 +1,12 @@
 // src/pages/teacher/repositories/Manage.tsx
 import { useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { ArrowLeft, Plus, FileText, Download, Trash2, ExternalLink } from "lucide-react";
-import { Button, Card, Skeleton, Badge, Input } from "../../../desingSystem/primitives";
+import { ArrowLeft, Plus, FileText, Trash2, ExternalLink, BookOpen } from "lucide-react";
+import { Button, Card, Skeleton, Badge } from "../../../desingSystem/primitives";
 import { useToast } from "../../../hooks/useToast";
 import { getRepositoryById, type Repository } from "../../../features/repository/services/repositoryService";
 import { api } from "../../../services/api";
+import { deleteLesson, getLessonsByRepository, type Lesson } from "../../../features/lessons/services/lessonService";
 import styles from "../../../features/repository/components/repository.module.css";
 
 interface Resource {
@@ -26,13 +27,14 @@ const ManageRepository = () => {
 
     const [repository, setRepository] = useState<Repository | null>(null);
     const [resources, setResources] = useState<Resource[]>([]);
+    const [lessons, setLessons] = useState<Lesson[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [isUploading, setIsUploading] = useState(false);
 
     useEffect(() => {
         if (id) {
             loadRepository();
             loadResources();
+            loadLessons();
         }
     }, [id]);
 
@@ -70,6 +72,10 @@ const ManageRepository = () => {
         navigate(`/docente/repositorios/gestionar/${id}/agregar-recurso`);
     };
 
+    const handleAddLesson = () => {
+        navigate(`/docente/repositorios/gestionar/${id}/agregar-leccion`);
+    };
+
     const handleDeleteResource = async (resourceId: number) => {
         if (!confirm("¿Estás seguro de eliminar este recurso?")) return;
 
@@ -80,6 +86,31 @@ const ManageRepository = () => {
                 description: "El recurso fue eliminado correctamente",
             });
             loadResources();
+        } catch (error: any) {
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: error.response?.data?.message || "No se pudo eliminar",
+            });
+        }
+    };
+
+    const loadLessons = async () => {
+        if (!id) return;
+        try {
+            setLessons(await getLessonsByRepository(id));
+        } catch (error) {
+            console.error("Error cargando lecciones:", error);
+        }
+    };
+
+    const handleDeleteLesson = async (lessonId: number) => {
+        if (!confirm("Estas seguro de eliminar esta leccion?")) return;
+
+        try {
+            await deleteLesson(lessonId);
+            toast({ title: "Leccion eliminada" });
+            loadLessons();
         } catch (error: any) {
             toast({
                 variant: "destructive",
@@ -121,9 +152,14 @@ const ManageRepository = () => {
                         <h1 className="text-3xl font-bold text-primary-contrast">{repository.title}</h1>
                         <p className="text-muted-foreground">{repository.description || "Sin descripción"}</p>
                     </div>
-                    <Button className="gap-2 bg-brand-action" onClick={handleAddResource}>
-                        <Plus className="h-4 w-4" /> Agregar Recurso
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" className="gap-2" onClick={handleAddLesson}>
+                            <BookOpen className="h-4 w-4" /> Agregar Leccion
+                        </Button>
+                        <Button className="gap-2 bg-brand-action" onClick={handleAddResource}>
+                            <Plus className="h-4 w-4" /> Agregar Recurso
+                        </Button>
+                    </div>
                 </div>
             </div>
 
@@ -150,6 +186,44 @@ const ManageRepository = () => {
                                 <Badge key={tag} variant="secondary">{tag}</Badge>
                             ))}
                         </div>
+                    </div>
+                )}
+            </Card>
+
+            <Card className="p-6 mb-6">
+                <h2 className="text-xl font-bold mb-4">Lecciones ({lessons.length})</h2>
+
+                {lessons.length === 0 ? (
+                    <div className="text-center py-12 border-2 border-dashed rounded-xl">
+                        <BookOpen className="h-12 w-12 mx-auto mb-4 text-neutral-300" />
+                        <p className="text-muted-foreground">No hay lecciones aun</p>
+                        <Button className="mt-4 gap-2" onClick={handleAddLesson}>
+                            <Plus className="h-4 w-4" /> Agregar Primera Leccion
+                        </Button>
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                        {lessons.map((lesson) => (
+                            <div key={lesson.id_leccion} className="flex items-center justify-between p-4 border rounded-lg hover:bg-neutral-50">
+                                <div className="flex items-center gap-3 flex-1">
+                                    <BookOpen className="h-5 w-5 text-brand-action" />
+                                    <div className="flex-1">
+                                        <h3 className="font-semibold">{lesson.titulo}</h3>
+                                        {lesson.descripcion && (
+                                            <p className="text-sm text-muted-foreground">{lesson.descripcion}</p>
+                                        )}
+                                        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                                            <span>{lesson.dificultad}</span>
+                                            <span>•</span>
+                                            <span>{lesson.duracion_minutos} min</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <Button variant="ghost" size="sm" onClick={() => handleDeleteLesson(lesson.id_leccion)}>
+                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
+                            </div>
+                        ))}
                     </div>
                 )}
             </Card>

@@ -15,17 +15,6 @@ const sanitizeText = (text: string): string => {
 };
 
 /**
- * Validador personalizado para texto sanitizado
- */
-const sanitizedString = (minLength: number = 1, maxLength: number = 500) => {
-  return z
-    .string()
-    .min(minLength)
-    .max(maxLength)
-    .transform((val) => sanitizeText(val));
-};
-
-/**
  * Esquema para edición de perfil
  */
 export const profileSchema = z.object({
@@ -79,9 +68,13 @@ export type ProfileFormData = z.infer<typeof profileSchema>;
  * Esquema para cambio de contraseña (SIN currentPassword)
  */
 export const passwordSchema = z.object({
+  currentPassword: z
+    .string()
+    .min(1, "Ingresa tu contrasena actual"),
+
   newPassword: z
     .string()
-    .min(6, "La nueva contraseña debe tener al menos 6 caracteres")
+    .min(8, "La nueva contrasena debe tener al menos 8 caracteres")
     .max(100, "La contraseña es demasiado larga")
     .regex(
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
@@ -118,7 +111,7 @@ export const registerSchema = z.object({
   
   password: z
     .string()
-    .min(6, "Mínimo 6 caracteres")
+    .min(8, "Minimo 8 caracteres")
     .max(100, "La contraseña es demasiado larga")
     .regex(
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,

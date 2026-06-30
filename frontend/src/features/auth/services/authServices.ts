@@ -47,7 +47,17 @@ export interface UpdateProfileData {
 }
 
 export interface UpdatePasswordData {
+  currentPassword: string;
   newPassword: string;
+}
+
+export interface SessionInfoResponse {
+  id: string;
+  device: string;
+  location: string;
+  lastActive: string;
+  startedAt: string;
+  isCurrent: boolean;
 }
 
 // ========================================
@@ -156,6 +166,16 @@ export const login = async (credentials: LoginCredentials): Promise<AuthResponse
   }
 };
 
+export const quickLogin = async (email: string): Promise<AuthResponse> => {
+  const response = await api.post<AuthResponse>("/auth/quick-login", {
+    email,
+    provider: "google",
+    nombres: email.split("@")[0] || "Usuario",
+    apellidos: "PAE",
+  });
+  return response.data;
+};
+
 /**
  * Actualiza el perfil del usuario
  * PUT /api/auth/profile
@@ -192,6 +212,35 @@ export const updatePassword = async (data: UpdatePasswordData): Promise<{ should
     console.error('❌ Error cambiando contraseña:', error);
     throw new Error("No se pudo cambiar la contraseña");
   }
+};
+
+export const requestPasswordReset = async (email: string) => {
+  const response = await api.post<{ message: string; resetToken?: string }>("/auth/forgot-password", { email });
+  return response.data;
+};
+
+export const resetPassword = async (token: string, newPassword: string) => {
+  const response = await api.post<{ message: string }>("/auth/reset-password", { token, newPassword });
+  return response.data;
+};
+
+export const getSessions = async () => {
+  const response = await api.get<{ sessions: SessionInfoResponse[] }>("/auth/sessions");
+  return response.data.sessions;
+};
+
+export const logoutAllSessions = async () => {
+  await api.post("/auth/logout-all");
+};
+
+export const requestTwoFactor = async () => {
+  const response = await api.post<{ code?: string; message: string }>("/auth/2fa/request");
+  return response.data;
+};
+
+export const verifyTwoFactor = async (code: string) => {
+  const response = await api.post<{ message: string }>("/auth/2fa/verify", { code });
+  return response.data;
 };
 
 /**

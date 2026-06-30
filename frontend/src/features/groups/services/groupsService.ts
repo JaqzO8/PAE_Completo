@@ -1,8 +1,9 @@
-// src/features/groups/services/groupsService.ts
-import { api } from "../../../services/api";
+import {
+  communityService,
+  type Community,
+  type CommunityPerformance,
+} from "../../community/services/communityService";
 
-// ========== INTERFACES ==========
-// NOTA: Estas interfaces son compartidas entre docentes y estudiantes
 export interface Group {
   id: string;
   name: string;
@@ -51,6 +52,7 @@ export interface GroupAnalytics {
     messages: number;
     avatar?: string;
   }>;
+  performance?: CommunityPerformance | null;
 }
 
 export interface GroupDetail extends Group {
@@ -62,234 +64,102 @@ export interface GroupDetail extends Group {
   analytics: GroupAnalytics;
 }
 
-// ========== MOCK DATA ==========
-const MOCK_GROUPS: Group[] = [
-  {
-    id: "1",
-    name: "Cálculo Diferencial 2025-I",
-    subject: "Matemáticas",
-    membersCount: 32,
-    avatar: "https://api.dicebear.com/7.x/shapes/svg?seed=calc",
-    status: "Activo",
-    lastActivity: "Hace 5 min",
+const formatDate = (date?: string | null) => {
+  if (!date) return "";
+  return new Intl.DateTimeFormat("es-PE", { day: "2-digit", month: "short", year: "numeric" }).format(
+    new Date(date)
+  );
+};
+
+const fallbackAvatar = (seed: string) =>
+  `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(seed)}`;
+
+const mapCommunityToGroup = (community: Community): Group => ({
+  id: String(community.id),
+  name: community.nombre,
+  subject: community.materia || "General",
+  membersCount: community.miembros_count ?? 0,
+  avatar: community.icono_url || fallbackAvatar(community.nombre),
+  status: community.is_member === false ? "Publica" : "Activo",
+  lastActivity: community.fecha_creacion ? `Creada ${formatDate(community.fecha_creacion)}` : undefined,
+});
+
+const mapCommunityToDetail = (community: Community): GroupDetail => ({
+  ...mapCommunityToGroup(community),
+  description: community.descripcion || "Comunidad de aprendizaje colaborativo.",
+  createdAt: formatDate(community.fecha_creacion),
+  messages: (community.messages || []).map((message) => ({
+    id: String(message.id),
+    author: message.author,
+    authorRole: message.authorRole,
+    content: message.content,
+    timestamp: formatDate(message.timestamp) || message.timestamp,
+    avatar: message.avatar || undefined,
+  })),
+  participants: (community.participants || []).map((participant) => ({
+    id: String(participant.id),
+    name: participant.name,
+    role: participant.role,
+    avatar: participant.avatar || undefined,
+    email: participant.email,
+    joinedAt: formatDate(participant.joinedAt),
+  })),
+  forums: (community.forums || []).map((forum) => ({
+    id: String(forum.id),
+    title: forum.title,
+    author: forum.author,
+    authorAvatar: forum.authorAvatar || undefined,
+    replies: forum.replies,
+    lastReply: forum.lastReply,
+    isResolved: forum.isResolved,
+  })),
+  analytics: community.analytics
+    ? {
+        ...community.analytics,
+        topContributors: community.analytics.topContributors.map((contributor) => ({
+          ...contributor,
+          avatar: contributor.avatar || undefined,
+        })),
+      }
+    : {
+    totalMessages: community.messages?.length || 0,
+    activeMembers: community.miembros_count || 0,
+    avgResponseTime: "Sin datos",
+    participationRate: 0,
+    topContributors: [],
   },
-  {
-    id: "2",
-    name: "Historia Universal - Grupo A",
-    subject: "Humanidades",
-    membersCount: 24,
-    avatar: "https://api.dicebear.com/7.x/shapes/svg?seed=hist",
-    status: "Activo",
-    lastActivity: "Hace 1 hora",
-  },
-  {
-    id: "3",
-    name: "Física Cuántica Avanzada",
-    subject: "Física",
-    membersCount: 18,
-    avatar: "https://api.dicebear.com/7.x/shapes/svg?seed=phys",
-    status: "Activo",
-    lastActivity: "Hace 3 horas",
-  },
-];
+});
 
-const MOCK_GROUP_DETAIL: GroupDetail = {
-  id: "1",
-  name: "Cálculo Diferencial 2025-I",
-  subject: "Matemáticas",
-  membersCount: 32,
-  avatar: "https://api.dicebear.com/7.x/shapes/svg?seed=calc",
-  status: "Activo • 28 en línea",
-  description: "Comunidad de estudio para la materia de Cálculo Diferencial del semestre 2025-I",
-  createdAt: "Enero 2025",
-  lastActivity: "Hace 5 min",
-  
-  messages: [
-    {
-      id: "1",
-      author: "Prof. Carlos Mendoza",
-      authorRole: "docente",
-      content: "Buenos días a todos. Les recuerdo que mañana tenemos examen parcial. Repasen los temas 1-5.",
-      timestamp: "10:30 AM",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=carlos",
-    },
-    {
-      id: "2",
-      author: "Ana García",
-      authorRole: "estudiante",
-      content: "Profesor, ¿el tema de límites infinitos entra en el examen?",
-      timestamp: "10:35 AM",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=ana",
-    },
-    {
-      id: "3",
-      author: "Prof. Carlos Mendoza",
-      authorRole: "docente",
-      content: "Sí Ana, es parte del tema 3. Revisen los ejercicios de la guía.",
-      timestamp: "10:37 AM",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=carlos",
-    },
-    {
-      id: "4",
-      author: "Luis Ramírez",
-      authorRole: "estudiante",
-      content: "¿Alguien tiene las respuestas de los ejercicios 15-20? Me trabé en el 17.",
-      timestamp: "11:05 AM",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=luis",
-    },
-  ],
-
-  participants: [
-    {
-      id: "p1",
-      name: "Prof. Carlos Mendoza",
-      role: "docente",
-      email: "cmendoza@pae.edu",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=carlos",
-      joinedAt: "Enero 2025",
-    },
-    {
-      id: "p2",
-      name: "Ana García",
-      role: "estudiante",
-      email: "agarcia@estudiantes.pae.edu",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=ana",
-      joinedAt: "Enero 2025",
-    },
-    {
-      id: "p3",
-      name: "Luis Ramírez",
-      role: "estudiante",
-      email: "lramirez@estudiantes.pae.edu",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=luis",
-      joinedAt: "Enero 2025",
-    },
-    {
-      id: "p4",
-      name: "María Torres",
-      role: "estudiante",
-      email: "mtorres@estudiantes.pae.edu",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=maria",
-      joinedAt: "Enero 2025",
-    },
-  ],
-
-  forums: [
-    {
-      id: "f1",
-      title: "¿Cómo resolver derivadas implícitas?",
-      author: "Carlos Pérez",
-      authorAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=carlos2",
-      replies: 12,
-      lastReply: "Hace 2 horas",
-      isResolved: true,
-    },
-    {
-      id: "f2",
-      title: "Duda sobre la regla de la cadena",
-      author: "Sofia Méndez",
-      authorAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=sofia",
-      replies: 8,
-      lastReply: "Hace 30 min",
-      isResolved: false,
-    },
-    {
-      id: "f3",
-      title: "Material complementario para límites",
-      author: "Prof. Carlos Mendoza",
-      authorAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=carlos",
-      replies: 5,
-      lastReply: "Hace 1 día",
-      isResolved: false,
-    },
-  ],
-
-  analytics: {
-    totalMessages: 287,
-    activeMembers: 28,
-    avgResponseTime: "15 min",
-    participationRate: 87.5,
-    topContributors: [
-      {
-        name: "Ana García",
-        messages: 45,
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=ana",
-      },
-      {
-        name: "Luis Ramírez",
-        messages: 38,
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=luis",
-      },
-      {
-        name: "María Torres",
-        messages: 32,
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=maria",
-      },
-    ],
-  },
-};
-
-// ========== SERVICIOS MOCK ==========
-const getGroupsMock = async (): Promise<Group[]> => {
-  return new Promise((resolve) => setTimeout(() => resolve(MOCK_GROUPS), 800));
-};
-
-const getGroupDetailMock = async (id: string): Promise<GroupDetail> => {
-  return new Promise((resolve) => setTimeout(() => resolve(MOCK_GROUP_DETAIL), 600));
-};
-
-// ========== SERVICIOS API ==========
-const getGroupsApi = async (): Promise<Group[]> => {
-  const response = await api.get("/teacher/groups");
-  return response.data;
-};
-
-const getGroupDetailApi = async (id: string): Promise<GroupDetail> => {
-  const response = await api.get(`/teacher/groups/${id}`);
-  return response.data;
-};
-
-// ========== EXPORTACIONES CON FALLBACK ==========
 export const getTeacherGroups = async (): Promise<Group[]> => {
-  if (import.meta.env.VITE_USE_MOCKS === "true") {
-    console.log("🔶 Modo Mock: Groups List");
-    return getGroupsMock();
-  }
+  const communities = await communityService.getMyCommunities();
+  return communities.map(mapCommunityToGroup);
+};
 
-  try {
-    return await getGroupsApi();
-  } catch (error) {
-    console.warn("🔴 API Error (Groups), using mock.", error);
-    return getGroupsMock();
-  }
+export const getStudentGroups = async (): Promise<Group[]> => {
+  const communities = await communityService.getMyCommunities();
+  return communities.map(mapCommunityToGroup);
 };
 
 export const getGroupDetail = async (id: string): Promise<GroupDetail> => {
-  if (import.meta.env.VITE_USE_MOCKS === "true") {
-    console.log("🔶 Modo Mock: Group Detail");
-    return getGroupDetailMock(id);
-  }
-
-  try {
-    return await getGroupDetailApi(id);
-  } catch (error) {
-    console.warn("🔴 API Error (Group Detail), using mock.", error);
-    return getGroupDetailMock(id);
-  }
+  const community = await communityService.getDetail(id);
+  return mapCommunityToDetail(community);
 };
 
-// ========== FUNCIÓN PARA ESTUDIANTES (FALTABA) ==========a
-export const getStudentGroups = async (): Promise<Group[]> => {
-  if (import.meta.env.VITE_USE_MOCKS === "true") {
-    console.log("🔶 Modo Mock: Student Groups");
-    return getGroupsMock();
-  }
-
-  try {
-    const response = await api.get("/student/groups");
-    return response.data;
-  } catch (error) {
-    console.warn("🔴 API Error (Student Groups), using mock.", error);
-    return getGroupsMock();
-  }
+export const createGroup = async (data: {
+  name: string;
+  description?: string;
+  subject?: string;
+  isPublic?: boolean;
+}): Promise<Group> => {
+  const community = await communityService.create({
+    nombre: data.name,
+    descripcion: data.description,
+    materia: data.subject,
+    es_publica: data.isPublic,
+  });
+  return mapCommunityToGroup(community);
 };
+
+export const deleteGroup = (id: string) => communityService.delete(id);
+export const leaveGroup = (id: string) => communityService.leave(id);
+export const sendGroupMessage = (id: string, content: string) => communityService.sendMessage(id, content);

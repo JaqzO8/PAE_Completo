@@ -8,12 +8,12 @@ const sequelize = new Sequelize({
     username: config.DB_USER,
     password: config.DB_PASSWORD,
     dialect: 'postgres',
-    logging: config.NODE_ENV === 'development' ? console.log : false,
+    logging: config.LOG_SQL ? console.log : false,
     pool: {
-        max: 10,
-        min: 0,
-        acquire: 30000,
-        idle: 10000,
+        max: config.DB_POOL_MAX,
+        min: config.DB_POOL_MIN,
+        acquire: config.DB_POOL_ACQUIRE_MS,
+        idle: config.DB_POOL_IDLE_MS,
     },
     define: {
         timestamps: true,

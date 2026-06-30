@@ -2,6 +2,9 @@ const { Comunidad, MiembroComunidad, MensajeCanal, DesafioSemanal } = require('.
 const { Op } = require('sequelize');
 const axios = require('axios');
 const config = require('../config/env');
+const { buildCommunityPerformance } = require('../services/communityPerformanceService');
+
+const sameId = (left, right) => String(left) === String(right);
 
 class CommunityController {
     /**
@@ -303,7 +306,7 @@ class CommunityController {
             }
 
             // Verificar si el usuario es miembro
-            const isMember = community.miembros.some(m => m.usuario_id === userId);
+            const isMember = community.miembros.some(m => sameId(m.usuario_id, userId));
 
             if (!isMember && !community.es_publica) {
                 return res.status(403).json({
@@ -359,6 +362,48 @@ class CommunityController {
                 editado: msg.editado,
             }));
 
+            const participants = await Promise.all(
+                community.miembros.map(async (member) => {
+                    let userInfo = null;
+                    try {
+                        const response = await axios.get(
+                            `${config.AUTH_SERVICE_URL}/api/auth/user/${member.usuario_id}`,
+                            { headers: { Authorization: `Bearer ${req.token}` } }
+                        );
+                        userInfo = response.data.user;
+                    } catch (error) {
+                        console.error(`Error obteniendo participante ${member.usuario_id}:`, error.message);
+                    }
+
+                    return {
+                        id: member.usuario_id.toString(),
+                        name: userInfo
+                            ? `${userInfo.nombres} ${userInfo.apellidos}`
+                            : 'Usuario desconocido',
+                        role: member.rol_comunidad === 'profesor' ? 'docente' : 'estudiante',
+                        avatar: userInfo?.avatar || null,
+                        email: userInfo?.email || '',
+                        joinedAt: member.fecha_union,
+                    };
+                })
+            );
+
+            const totalMessages = await MensajeCanal.count({ where: { comunidad_id: id } });
+            const activeMemberIds = new Set(messages.map((msg) => String(msg.usuario_id)));
+            let performance = null;
+
+            if (isMember || sameId(community.profesor_id, userId) || req.user.rol === 'admin') {
+                try {
+                    performance = await buildCommunityPerformance({
+                        communityId: id,
+                        user: req.user,
+                        token: req.token,
+                    });
+                } catch (error) {
+                    console.error('Error calculando rendimiento comunitario:', error.message);
+                }
+            }
+
             res.status(200).json({
                 success: true,
                 community: {
@@ -379,6 +424,20 @@ class CommunityController {
                     desafios: community.desafios || [],
                     is_member: isMember,
                     messages: messagesData,
+                    participants,
+                    forums: [],
+                    analytics: {
+                        totalMessages,
+                        activeMembers: performance?.totals?.activeMembers ?? activeMemberIds.size,
+                        avgResponseTime: 'Calculado por actividad reciente',
+                        participationRate: performance?.rates?.participation ?? (
+                            community.miembros?.length
+                                ? Math.round((activeMemberIds.size / community.miembros.length) * 100)
+                                : 0
+                        ),
+                        topContributors: performance?.topContributors || [],
+                        performance,
+                    },
                 },
             });
         } catch (error) {
@@ -517,7 +576,7 @@ class CommunityController {
                 });
             }
 
-            if (community.profesor_id !== userId && req.user.rol !== 'admin') {
+            if (!sameId(community.profesor_id, userId) && req.user.rol !== 'admin') {
                 return res.status(403).json({
                     success: false,
                     message: 'Solo el profesor creador puede eliminar esta comunidad',
@@ -566,7 +625,7 @@ class CommunityController {
                 });
             }
 
-            if (community.profesor_id !== profesorId) {
+            if (!sameId(community.profesor_id, profesorId)) {
                 return res.status(403).json({
                     success: false,
                     message: 'Solo el profesor puede expulsar miembros',

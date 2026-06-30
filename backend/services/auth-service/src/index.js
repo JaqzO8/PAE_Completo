@@ -13,6 +13,14 @@ const app = express();
 
 app.set('trust proxy', 1);
 
+const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+const allowedOrigins = [
+    frontendUrl,
+    frontendUrl.replace('localhost', '127.0.0.1'),
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+];
+
 // ========================================
 // MIDDLEWARES GLOBALES
 // ========================================
@@ -22,7 +30,7 @@ app.use(helmet());
 
 // CORS
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: allowedOrigins,
     credentials: true,
 }));
 
@@ -33,7 +41,7 @@ app.use(express.urlencoded({ extended: true }));
 // Rate limiting
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutos
-    max: 100, // Máximo 100 requests por ventana
+    max: Number(process.env.AUTH_RATE_LIMIT_MAX || 3000),
     message: 'Demasiadas peticiones desde esta IP, intenta más tarde',
 });
 app.use('/api/auth', limiter);
@@ -41,7 +49,7 @@ app.use('/api/auth', limiter);
 // Rate limiting específico para login
 const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 5, // Máximo 5 intentos de login por ventana
+    max: Number(process.env.LOGIN_RATE_LIMIT_MAX || 20),
     skipSuccessfulRequests: true,
 });
 app.use('/api/auth/login', loginLimiter);
@@ -98,6 +106,10 @@ const startServer = async () => {
         if (!dbConnected) {
             throw new Error('No se pudo conectar a la base de datos');
         }
+
+        // 2. Crear tablas nuevas declaradas por modelos sin modificar datos existentes.
+        console.log('ðŸ§± Sincronizando modelos transversales...');
+        await syncDatabase();
 
         // 3. Inicializar roles por defecto
         console.log('👥 Inicializando roles...');

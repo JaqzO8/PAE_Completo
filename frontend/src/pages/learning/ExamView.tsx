@@ -6,23 +6,37 @@ import {
   Card,
   Button,
   Badge,
+  Textarea,
 } from "../../desingSystem/primitives";
 import { submitSimulacro, type SimulacroResult, type SimulacroSubmission } from "../../features/learning/services/learningService";
+import { clearActiveExam, loadActiveExam, saveActiveExam } from "../../features/learning/services/activeExamCache";
 import { useToast } from "../../hooks/useToast";
 import styles from "../../features/learning/components/learning.module.css";
+
+type AnswerValue = number | string | null;
 
 const ExamView = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  
-  const simulacro = location.state?.simulacro as SimulacroResult | undefined;
+  const cachedExam = loadActiveExam();
+  const stateSimulacro = location.state?.simulacro as SimulacroResult | undefined;
+  const simulacro = stateSimulacro || cachedExam?.simulacro;
+  const shouldRestoreCached = !stateSimulacro && cachedExam?.simulacro.id === simulacro?.id;
 
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [answers, setAnswers] = useState<(number | null)[]>(
-    simulacro ? new Array(simulacro.questions.length).fill(null) : []
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(
+    shouldRestoreCached ? cachedExam?.currentQuestionIndex || 0 : 0
   );
-  const [timeRemaining, setTimeRemaining] = useState(simulacro?.timeLimit || 0);
+  const [answers, setAnswers] = useState<AnswerValue[]>(
+    simulacro
+      ? shouldRestoreCached
+        ? cachedExam?.answers || new Array(simulacro.questions.length).fill(null)
+        : new Array(simulacro.questions.length).fill(null)
+      : []
+  );
+  const [timeRemaining, setTimeRemaining] = useState(
+    simulacro ? (shouldRestoreCached ? cachedExam?.timeRemaining || simulacro.timeLimit : simulacro.timeLimit) : 0
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [markedForReview, setMarkedForReview] = useState<Set<number>>(new Set());
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
@@ -53,6 +67,7 @@ const ExamView = () => {
       };
 
       const result = await submitSimulacro(submission);
+      clearActiveExam(simulacro.id);
       
       navigate(`${basePath}/aprendizaje/simulacros/resultados`, {
         state: { result },
@@ -67,6 +82,17 @@ const ExamView = () => {
       setIsSubmitting(false);
     }
   }, [answers, simulacro, timeRemaining, navigate, toast, basePath]);
+
+  useEffect(() => {
+    if (!simulacro || isSubmitting) return;
+    saveActiveExam({
+      simulacro,
+      answers,
+      currentQuestionIndex,
+      timeRemaining,
+      updatedAt: new Date().toISOString(),
+    });
+  }, [answers, currentQuestionIndex, isSubmitting, simulacro, timeRemaining]);
 
   // Timer
   useEffect(() => {
@@ -131,6 +157,12 @@ const ExamView = () => {
     setAnswers(newAnswers);
   };
 
+  const handleOpenAnswerChange = (value: string) => {
+    const newAnswers = [...answers];
+    newAnswers[currentQuestionIndex] = value;
+    setAnswers(newAnswers);
+  };
+
   const handleMarkForReview = () => {
     const newMarked = new Set(markedForReview);
     if (newMarked.has(currentQuestionIndex)) {
@@ -155,7 +187,7 @@ const ExamView = () => {
 
   // ✅ handleSubmit manual (sin duplicar handleAutoSubmit)
   const handleSubmit = async () => {
-    const unanswered = answers.filter((a) => a === null).length;
+    const unanswered = answers.filter((a) => a === null || a === "").length;
     
     if (unanswered > 0 && !showSubmitConfirm) {
       setShowSubmitConfirm(true);
@@ -173,6 +205,7 @@ const ExamView = () => {
       };
 
       const result = await submitSimulacro(submission);
+      clearActiveExam(simulacro.id);
       
       navigate(`${basePath}/aprendizaje/simulacros/resultados`, {
         state: { result },
@@ -189,9 +222,9 @@ const ExamView = () => {
     }
   };
 
-  const answeredCount = answers.filter((a) => a !== null).length;
+  const answeredCount = answers.filter((a) => a !== null && a !== "").length;
   const isTimeWarning = timeRemaining < 300; // Últimos 5 minutos
-  const unansweredCount = answers.filter((a) => a === null).length;
+  const unansweredCount = answers.filter((a) => a === null || a === "").length;
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -255,7 +288,7 @@ const ExamView = () => {
           </div>
           <div className="flex flex-wrap gap-2">
             {simulacro.questions.map((_, index) => {
-              const isAnswered = answers[index] !== null;
+              const isAnswered = answers[index] !== null && answers[index] !== "";
               const isMarked = markedForReview.has(index);
               const isCurrent = currentQuestionIndex === index;
 
@@ -309,35 +342,49 @@ const ExamView = () => {
             {currentQuestion.question}
           </p>
 
-          {/* Opciones */}
-          <div className="space-y-4">
-            {currentQuestion.options.map((option, index) => (
-              <button
-                key={index}
-                onClick={() => handleAnswerSelect(index)}
-                className={`
-                  w-full p-4 rounded-xl border-2 text-left font-medium transition-all
-                  ${answers[currentQuestionIndex] === index
-                    ? "border-brand-action bg-brand-action/5 text-brand-action"
-                    : "border-neutral-200 hover:border-brand-action/50 hover:bg-neutral-50"
-                  }
-                `}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`
-                    w-8 h-8 rounded-full border-2 flex items-center justify-center font-bold
+          {currentQuestion.type === "abierta" ? (
+            <div className="space-y-3">
+              <Badge variant="outline">Respuesta abierta</Badge>
+              <Textarea
+                className="min-h-40 text-base leading-relaxed"
+                placeholder="Escribe tu respuesta con claridad y sustento."
+                value={typeof answers[currentQuestionIndex] === "string" ? answers[currentQuestionIndex] : ""}
+                onChange={(event) => handleOpenAnswerChange(event.target.value)}
+              />
+              <p className="text-sm text-muted-foreground">
+                Esta respuesta sera revisada por un docente y se incorporara al puntaje final.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {currentQuestion.options.map((option, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleAnswerSelect(index)}
+                  className={`
+                    w-full p-4 rounded-xl border-2 text-left font-medium transition-all
                     ${answers[currentQuestionIndex] === index
-                      ? "border-brand-action bg-brand-action text-white"
-                      : "border-neutral-300 text-neutral-500"
+                      ? "border-brand-action bg-brand-action/5 text-brand-action"
+                      : "border-neutral-200 hover:border-brand-action/50 hover:bg-neutral-50"
                     }
-                  `}>
-                    {String.fromCharCode(65 + index)}
+                  `}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`
+                      w-8 h-8 rounded-full border-2 flex items-center justify-center font-bold
+                      ${answers[currentQuestionIndex] === index
+                        ? "border-brand-action bg-brand-action text-white"
+                        : "border-neutral-300 text-neutral-500"
+                      }
+                    `}>
+                      {String.fromCharCode(65 + index)}
+                    </div>
+                    <span>{option}</span>
                   </div>
-                  <span>{option}</span>
-                </div>
-              </button>
-            ))}
-          </div>
+                </button>
+              ))}
+            </div>
+          )}
         </Card>
 
         {/* Navegación */}

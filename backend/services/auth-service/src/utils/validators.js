@@ -22,8 +22,8 @@ const validateRegister = [
 
     body('password')
         .notEmpty().withMessage('La contraseña es requerida')
-        .isLength({ min: 6, max: 100 }).withMessage('La contraseña debe tener entre 6 y 100 caracteres')
-        .matches(/^(?=.*[a-zA-Z])(?=.*[0-9])/).withMessage('Debe contener al menos una letra y un número'),
+        .isLength({ min: 8, max: 100 }).withMessage('La contrasena debe tener entre 8 y 100 caracteres')
+        .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])/).withMessage('Debe contener mayusculas, minusculas y numeros'),
 
     body('isTeacher')
         .isBoolean().withMessage('isTeacher debe ser un valor booleano'),
@@ -68,10 +68,13 @@ const validateUpdateProfile = [
 
 // Validaciones para cambio de contraseña
 const validateUpdatePassword = [
+    body('currentPassword')
+        .notEmpty().withMessage('La contrasena actual es requerida'),
+
     body('newPassword')
         .notEmpty().withMessage('La nueva contraseña es requerida')
-        .isLength({ min: 6, max: 100 }).withMessage('La contraseña debe tener entre 6 y 100 caracteres')
-        .matches(/^(?=.*[a-zA-Z])(?=.*[0-9])/).withMessage('Debe contener al menos una letra y un número'),
+        .isLength({ min: 8, max: 100 }).withMessage('La contrasena debe tener entre 8 y 100 caracteres')
+        .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])/).withMessage('Debe contener mayusculas, minusculas y numeros'),
 ];
 
 // Middleware para manejar errores de validación

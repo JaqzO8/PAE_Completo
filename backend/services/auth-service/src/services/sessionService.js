@@ -1,5 +1,16 @@
 const { Sesion, HistorialSesion } = require('../models');
 const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
+
+const truncate = (value, maxLength) => {
+    if (!value) return value;
+    return String(value).slice(0, maxLength);
+};
+
+const tokenFingerprint = (token) => crypto
+    .createHash('sha256')
+    .update(String(token || ''))
+    .digest('hex');
 
 class SessionService {
     /**
@@ -9,9 +20,9 @@ class SessionService {
         try {
             const session = await Sesion.create({
                 id_usuario: userId,
-                token_sesion: token,
-                dispositivo: deviceInfo.device || 'Desconocido',
-                ip_address: deviceInfo.ip || null,
+                token_sesion: tokenFingerprint(token),
+                dispositivo: truncate(deviceInfo.device || 'Desconocido', 100),
+                ip_address: truncate(deviceInfo.ip || null, 45),
                 user_agent: deviceInfo.userAgent || null,
                 fecha_inicio: new Date(),
                 fecha_ultimo_acceso: new Date(),
@@ -35,7 +46,7 @@ class SessionService {
         try {
             await Sesion.update(
                 { fecha_ultimo_acceso: new Date() },
-                { where: { token_sesion: token, activa: true } }
+                { where: { token_sesion: tokenFingerprint(token), activa: true } }
             );
         } catch (error) {
             console.error('Error actualizando último acceso:', error);
@@ -48,7 +59,7 @@ class SessionService {
     static async deactivateSession(token, deviceInfo) {
         try {
             const session = await Sesion.findOne({
-                where: { token_sesion: token, activa: true },
+                where: { token_sesion: tokenFingerprint(token), activa: true },
             });
 
             if (session) {
@@ -107,8 +118,8 @@ class SessionService {
         try {
             await HistorialSesion.create({
                 id_usuario: userId,
-                dispositivo: deviceInfo.device || 'Desconocido',
-                ip_address: deviceInfo.ip || null,
+                dispositivo: truncate(deviceInfo.device || 'Desconocido', 100),
+                ip_address: truncate(deviceInfo.ip || null, 45),
                 fecha_acceso: new Date(),
                 accion: action,
                 exitoso: success,

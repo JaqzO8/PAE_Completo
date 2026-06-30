@@ -23,6 +23,8 @@ const repoSchema = z.object({
   tags: z.array(z.string()).optional(),
   publico: z.boolean().default(true),
 });
+type RepoFormInput = z.input<typeof repoSchema>;
+type RepoFormData = z.output<typeof repoSchema>;
 
 const TeacherRepoCreate = () => {
   const navigate = useNavigate();
@@ -33,7 +35,7 @@ const TeacherRepoCreate = () => {
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   
-  const form = useForm<z.infer<typeof repoSchema>>({
+  const form = useForm<RepoFormInput, unknown, RepoFormData>({
     resolver: zodResolver(repoSchema),
     defaultValues: { 
       titulo: "", 
@@ -67,7 +69,7 @@ const TeacherRepoCreate = () => {
     setTags(tags.filter(t => t !== tagToRemove));
   };
 
-  const onSubmit = async (data: z.infer<typeof repoSchema>) => {
+  const onSubmit = async (data: RepoFormData) => {
     await create({
       ...data,
       tags: tags.length > 0 ? tags : undefined,
@@ -192,7 +194,7 @@ const TeacherRepoCreate = () => {
               <FormField
                 control={form.control}
                 name="publico"
-                render={({ field }) => (
+                render={() => (
                   <FormItem className="flex items-center justify-between rounded-lg border p-4">
                     <div className="space-y-0.5">
                       <FormLabel className="text-base">Repositorio Público</FormLabel>

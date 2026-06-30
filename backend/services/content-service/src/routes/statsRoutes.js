@@ -15,5 +15,7 @@ router.get('/student', verifyToken, isAuthenticated, StatsController.getStudentS
  * Estadísticas del docente
  */
 router.get('/teacher', verifyToken, isTeacher, StatsController.getTeacherStats);
+router.get('/study-settings', verifyToken, isTeacher, StatsController.getStudySettings);
+router.put('/study-settings', verifyToken, isTeacher, StatsController.updateStudySettings);
 
 module.exports = router;

@@ -1,0 +1,9 @@
+{
+    "sonarlint.connectedMode.project": {
+        "connectionId": "http-localhost-9010",
+        "projectKey": "Pae_Mod2"
+    },
+    "cx.enableScanButtons": true,
+    "cx.enableUserCredentialsLogin": true,
+    "cx.enableWorkspaceOnlyScan": true
+}

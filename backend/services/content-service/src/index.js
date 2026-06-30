@@ -6,8 +6,8 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
 const config = require('./config/env');
-const { testConnection } = require('./config/database');
-const { initializeCategories } = require('./models');
+const { testConnection, syncDatabase } = require('./config/database');
+const { initializeCategories, initializeStudySettings, initializePlanningSettings } = require('./models');
 const { errorHandler, notFound } = require('./middlewares/errorMiddleware');
 
 // Importar rutas
@@ -16,9 +16,18 @@ const repositoryRoutes = require('./routes/repositoryRoutes');
 const resourceRoutes = require('./routes/resourceRoutes');
 const favoriteRoutes = require('./routes/favoriteRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
+const lessonRoutes = require('./routes/lessonRoutes');
+const planningRoutes = require('./routes/planningRoutes');
 
 const app = express();
 app.set('trust proxy', 1);
+
+const allowedOrigins = [
+    config.FRONTEND_URL,
+    config.FRONTEND_URL.replace('localhost', '127.0.0.1'),
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+];
 
 // =================================================
 // MIDDLEWARES BÁSICOS
@@ -27,9 +36,9 @@ app.use(helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" } // ✅ Permite cargar recursos de otros orígenes
 }));
 
-app.use(cors({ 
-    origin: config.FRONTEND_URL, 
-    credentials: true 
+app.use(cors({
+    origin: allowedOrigins,
+    credentials: true,
 }));
 
 app.use(express.json());
@@ -72,7 +81,7 @@ app.use('/uploads', (req, res) => {
 // =================================================
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 200,
+    max: Number(process.env.CONTENT_RATE_LIMIT_MAX || 3000),
 });
 app.use('/api/content', limiter);
 
@@ -83,6 +92,8 @@ app.use('/api/content', limiter);
 app.use('/api/content/stats', statsRoutes);
 app.use('/api/content/repositories', repositoryRoutes);
 app.use('/api/content/resources', resourceRoutes);
+app.use('/api/content/lessons', lessonRoutes);
+app.use('/api/content/planning', planningRoutes);
 app.use('/api/content/favorites', favoriteRoutes);
 app.use('/api/content/categories', categoryRoutes);
 app.use('/api/content/tags', categoryRoutes);
@@ -112,10 +123,13 @@ const startServer = async () => {
         
         // Verificar conexión a la base de datos
         await testConnection();
+        await syncDatabase();
         console.log('✅ Conexión a la base de datos exitosa');
         
         // Inicializar categorías por defecto
         await initializeCategories();
+        await initializeStudySettings();
+        await initializePlanningSettings();
         console.log('✅ Categorías inicializadas');
         
         // Iniciar servidor

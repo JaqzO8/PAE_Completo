@@ -24,7 +24,11 @@ import {
   ScrollArea,
 } from "../../../desingSystem/primitives";
 import { ParticipantsSheet } from "../../../features/groups/components/ParticipantsSheet";
-import { getGroupDetail, type GroupDetail as GroupDetailType } from "../../../features/groups/services/groupsService";
+import {
+  getGroupDetail,
+  sendGroupMessage,
+  type GroupDetail as GroupDetailType,
+} from "../../../features/groups/services/groupsService";
 import { useToast } from "../../../hooks/useToast";
 import styles from "../../../features/groups/components/groups.module.css";
 
@@ -37,6 +41,7 @@ export default function GroupDetail() {
   const [isLoading, setIsLoading] = useState(true);
   const [showParticipants, setShowParticipants] = useState(false);
   const [message, setMessage] = useState("");
+  const performance = group?.analytics.performance;
 
   useEffect(() => {
     if (!id) return;
@@ -60,13 +65,11 @@ export default function GroupDetail() {
     }
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!message.trim()) return;
-    toast({
-      title: "Mensaje enviado",
-      description: "Tu mensaje ha sido publicado en el chat.",
-    });
+    await sendGroupMessage(id!, message.trim());
     setMessage("");
+    await loadGroupDetail();
   };
 
   const handleLeaveGroup = () => {
@@ -141,7 +144,7 @@ export default function GroupDetail() {
             </TabsTrigger>
             <TabsTrigger value="analytics" className="gap-2">
               <BarChart3 className="h-4 w-4" />
-              Analítica
+              Rendimiento
             </TabsTrigger>
           </TabsList>
 
@@ -232,6 +235,25 @@ export default function GroupDetail() {
           {/* TAB 3: Analítica (Solo Docente) */}
           <TabsContent value="analytics" className="flex-1 m-0">
             <div className={styles.analyticsGrid}>
+              {performance && (
+                <Card className={`${styles.analyticsCard} md:col-span-2`}>
+                  <h3 className={styles.analyticsTitle}>Perfil de Rendimiento Comunitario</h3>
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className={styles.analyticsStat}>{performance.score}/100</p>
+                      <p className={styles.analyticsSubtext}>
+                        Estado: {performance.status === "en_riesgo" ? "en riesgo" : performance.status}
+                      </p>
+                    </div>
+                    <div className="grid gap-2 text-sm text-neutral-600 sm:grid-cols-2">
+                      <span>Participacion: {performance.rates.participation}%</span>
+                      <span>Mensajes: {performance.rates.messages}%</span>
+                      <span>Recursos: {performance.rates.resources}%</span>
+                      <span>Desafios: {performance.rates.challenges}%</span>
+                    </div>
+                  </div>
+                </Card>
+              )}
               <Card className={styles.analyticsCard}>
                 <h3 className={styles.analyticsTitle}>Mensajes Totales</h3>
                 <p className={styles.analyticsStat}>{group.analytics.totalMessages}</p>
@@ -267,7 +289,9 @@ export default function GroupDetail() {
               <Card className={`${styles.analyticsCard} md:col-span-2`}>
                 <h3 className={styles.analyticsTitle}>Principales Contribuidores</h3>
                 <div className={styles.contributorsList}>
-                  {group.analytics.topContributors.map((contributor, index) => (
+                  {group.analytics.topContributors.length === 0 ? (
+                    <p className="text-sm text-neutral-600">Aun no hay contribuciones suficientes en la ventana actual.</p>
+                  ) : group.analytics.topContributors.map((contributor, index) => (
                     <div key={index} className={styles.contributorItem}>
                       <Avatar className={styles.contributorAvatar}>
                         <AvatarImage src={contributor.avatar} alt={contributor.name} />
@@ -285,6 +309,18 @@ export default function GroupDetail() {
                   ))}
                 </div>
               </Card>
+              {performance && (
+                <Card className={`${styles.analyticsCard} md:col-span-2`}>
+                  <h3 className={styles.analyticsTitle}>Acciones Recomendadas</h3>
+                  <div className="space-y-2">
+                    {performance.recommendedActions.map((action) => (
+                      <p key={action} className="rounded-lg bg-neutral-50 px-3 py-2 text-sm text-neutral-700">
+                        {action}
+                      </p>
+                    ))}
+                  </div>
+                </Card>
+              )}
             </div>
           </TabsContent>
         </Tabs>

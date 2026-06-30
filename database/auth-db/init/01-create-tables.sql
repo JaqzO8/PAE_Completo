@@ -80,6 +80,44 @@ CREATE INDEX IF NOT EXISTS idx_historial_fecha_acceso ON historial_sesiones(fech
 CREATE INDEX IF NOT EXISTS idx_historial_accion ON historial_sesiones(accion);
 CREATE INDEX IF NOT EXISTS idx_historial_exitoso ON historial_sesiones(exitoso);
 
+-- Tabla de preferencias de interfaz y accesibilidad
+CREATE TABLE IF NOT EXISTS preferencias_usuario (
+    id_preferencia SERIAL PRIMARY KEY,
+    id_usuario INTEGER UNIQUE NOT NULL REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+    tema VARCHAR(20) NOT NULL DEFAULT 'light' CHECK (tema IN ('light', 'dark')),
+    tamano_fuente VARCHAR(20) NOT NULL DEFAULT 'medium' CHECK (tamano_fuente IN ('small', 'medium', 'large')),
+    reducir_movimiento BOOLEAN NOT NULL DEFAULT FALSE,
+    alto_contraste BOOLEAN NOT NULL DEFAULT FALSE,
+    notificaciones_email BOOLEAN NOT NULL DEFAULT TRUE,
+    notificaciones_desafios BOOLEAN NOT NULL DEFAULT TRUE,
+    notificaciones_comunidad BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_preferencias_usuario_id_usuario ON preferencias_usuario(id_usuario);
+CREATE INDEX IF NOT EXISTS idx_preferencias_usuario_tema ON preferencias_usuario(tema);
+
+-- Tabla de soporte tecnico, privacidad y accesibilidad
+CREATE TABLE IF NOT EXISTS tickets_soporte (
+    id_ticket SERIAL PRIMARY KEY,
+    id_usuario INTEGER NOT NULL REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+    asunto VARCHAR(160) NOT NULL,
+    descripcion TEXT NOT NULL,
+    categoria VARCHAR(40) NOT NULL DEFAULT 'tecnico' CHECK (categoria IN ('tecnico', 'cuenta', 'privacidad', 'contenido', 'accesibilidad')),
+    prioridad VARCHAR(20) NOT NULL DEFAULT 'media' CHECK (prioridad IN ('baja', 'media', 'alta')),
+    estado VARCHAR(20) NOT NULL DEFAULT 'abierto' CHECK (estado IN ('abierto', 'en_revision', 'resuelto', 'cerrado')),
+    respuesta TEXT,
+    fecha_respuesta TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_tickets_soporte_id_usuario ON tickets_soporte(id_usuario);
+CREATE INDEX IF NOT EXISTS idx_tickets_soporte_estado ON tickets_soporte(estado);
+CREATE INDEX IF NOT EXISTS idx_tickets_soporte_categoria ON tickets_soporte(categoria);
+CREATE INDEX IF NOT EXISTS idx_tickets_soporte_prioridad ON tickets_soporte(prioridad);
+
 -- ========================================
 -- Función para limpiar sesiones antiguas
 -- ========================================

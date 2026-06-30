@@ -25,7 +25,12 @@ import {
   ScrollArea,
 } from "../../../desingSystem/primitives";
 import { ParticipantsSheet } from "../../../features/groups/components/ParticipantsSheet";
-import { getGroupDetail, type GroupDetail as GroupDetailType } from "../../../features/groups/services/groupsService";
+import {
+  getGroupDetail,
+  leaveGroup,
+  sendGroupMessage,
+  type GroupDetail as GroupDetailType,
+} from "../../../features/groups/services/groupsService";
 import { useToast } from "../../../hooks/useToast";
 import { useAuth } from "../../../context/AuthContext";
 import styles from "../../../features/groups/components/groups.module.css";
@@ -42,8 +47,9 @@ export default function GroupDetail() {
   const [message, setMessage] = useState("");
 
   // ✅ Determinar si el usuario es docente
-  const isTeacher = user?.role === "docente";
+  const isTeacher = user?.rol === "docente";
   const basePath = isTeacher ? "/docente" : "/estudiante";
+  const performance = group?.analytics.performance;
 
   useEffect(() => {
     if (!id) return;
@@ -67,16 +73,15 @@ export default function GroupDetail() {
     }
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!message.trim()) return;
-    toast({
-      title: "Mensaje enviado",
-      description: "Tu mensaje ha sido publicado en el chat.",
-    });
+    await sendGroupMessage(id!, message.trim());
     setMessage("");
+    await loadGroupDetail();
   };
 
-  const handleLeaveGroup = () => {
+  const handleLeaveGroup = async () => {
+    if (id) await leaveGroup(id);
     toast({
       title: "Saliste del grupo",
       description: "Has abandonado esta comunidad.",
@@ -146,13 +151,10 @@ export default function GroupDetail() {
               <HelpCircle className="h-4 w-4" />
               Foros
             </TabsTrigger>
-            {/* ✅ CORRECCIÓN: Solo mostrar Analítica si es docente */}
-            {isTeacher && (
-              <TabsTrigger value="analytics" className="gap-2">
-                <BarChart3 className="h-4 w-4" />
-                Analítica
-              </TabsTrigger>
-            )}
+            <TabsTrigger value="analytics" className="gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Rendimiento
+            </TabsTrigger>
           </TabsList>
 
           {/* TAB 1: Chat */}
@@ -240,9 +242,27 @@ export default function GroupDetail() {
           </TabsContent>
 
           {/* TAB 3: Analítica (Solo Docente) */}
-          {isTeacher && (
-            <TabsContent value="analytics" className="flex-1 m-0">
+          <TabsContent value="analytics" className="flex-1 m-0">
               <div className={styles.analyticsGrid}>
+                {performance && (
+                  <Card className={`${styles.analyticsCard} md:col-span-2`}>
+                    <h3 className={styles.analyticsTitle}>Perfil de Rendimiento Comunitario</h3>
+                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className={styles.analyticsStat}>{performance.score}/100</p>
+                        <p className={styles.analyticsSubtext}>
+                          Estado: {performance.status === "en_riesgo" ? "en riesgo" : performance.status}
+                        </p>
+                      </div>
+                      <div className="grid gap-2 text-sm text-neutral-600 sm:grid-cols-2">
+                        <span>Participacion: {performance.rates.participation}%</span>
+                        <span>Mensajes: {performance.rates.messages}%</span>
+                        <span>Recursos: {performance.rates.resources}%</span>
+                        <span>Desafios: {performance.rates.challenges}%</span>
+                      </div>
+                    </div>
+                  </Card>
+                )}
                 <Card className={styles.analyticsCard}>
                   <h3 className={styles.analyticsTitle}>Mensajes Totales</h3>
                   <p className={styles.analyticsStat}>{group.analytics.totalMessages}</p>
@@ -278,7 +298,9 @@ export default function GroupDetail() {
                 <Card className={`${styles.analyticsCard} md:col-span-2`}>
                   <h3 className={styles.analyticsTitle}>Principales Contribuidores</h3>
                   <div className={styles.contributorsList}>
-                    {group.analytics.topContributors.map((contributor, index) => (
+                    {group.analytics.topContributors.length === 0 ? (
+                      <p className="text-sm text-neutral-600">Aun no hay contribuciones suficientes en la ventana actual.</p>
+                    ) : group.analytics.topContributors.map((contributor, index) => (
                       <div key={index} className={styles.contributorItem}>
                         <Avatar className={styles.contributorAvatar}>
                           <AvatarImage src={contributor.avatar} alt={contributor.name} />
@@ -296,9 +318,20 @@ export default function GroupDetail() {
                     ))}
                   </div>
                 </Card>
+                {performance && (
+                  <Card className={`${styles.analyticsCard} md:col-span-2`}>
+                    <h3 className={styles.analyticsTitle}>Acciones Recomendadas</h3>
+                    <div className="space-y-2">
+                      {performance.recommendedActions.map((action) => (
+                        <p key={action} className="rounded-lg bg-neutral-50 px-3 py-2 text-sm text-neutral-700">
+                          {action}
+                        </p>
+                      ))}
+                    </div>
+                  </Card>
+                )}
               </div>
-            </TabsContent>
-          )}
+          </TabsContent>
         </Tabs>
       </div>
 

@@ -5,6 +5,12 @@ const Resource = require('./Resource');
 const Favorite = require('./Favorite');
 const Rating = require('./Rating');
 const RepositoryTag = require('./RepositoryTag');
+const Lesson = require('./Lesson');
+const LessonProgress = require('./LessonProgress');
+const StudySetting = require('./StudySetting');
+const PlanningSetting = require('./PlanningSetting');
+const StudyPreference = require('./StudyPreference');
+const StudyReminder = require('./StudyReminder');
 
 // ========================================
 // RELACIONES
@@ -43,6 +49,28 @@ Repository.hasMany(Resource, {
 Resource.belongsTo(Repository, { 
     foreignKey: 'id_repositorio', 
     as: 'repositorio' 
+});
+
+// Repository - Lesson (Uno a Muchos)
+Repository.hasMany(Lesson, {
+    foreignKey: 'id_repositorio',
+    as: 'lecciones',
+    onDelete: 'CASCADE',
+});
+Lesson.belongsTo(Repository, {
+    foreignKey: 'id_repositorio',
+    as: 'repositorio',
+});
+
+// Lesson - LessonProgress (Uno a Muchos)
+Lesson.hasMany(LessonProgress, {
+    foreignKey: 'id_leccion',
+    as: 'progresos',
+    onDelete: 'CASCADE',
+});
+LessonProgress.belongsTo(Lesson, {
+    foreignKey: 'id_leccion',
+    as: 'leccion',
 });
 
 // Repository - Favorite (Uno a Muchos)
@@ -97,6 +125,20 @@ const initializeCategories = async () => {
     }
 };
 
+const initializeStudySettings = async () => {
+    await StudySetting.findOrCreate({
+        where: { id_configuracion: 1 },
+        defaults: { id_configuracion: 1 },
+    });
+};
+
+const initializePlanningSettings = async () => {
+    await PlanningSetting.findOrCreate({
+        where: { id_configuracion: 1 },
+        defaults: { id_configuracion: 1 },
+    });
+};
+
 module.exports = {
     Category,
     Tag,
@@ -105,5 +147,13 @@ module.exports = {
     Favorite,
     Rating,
     RepositoryTag,
+    Lesson,
+    LessonProgress,
+    StudySetting,
+    PlanningSetting,
+    StudyPreference,
+    StudyReminder,
     initializeCategories,
+    initializeStudySettings,
+    initializePlanningSettings,
 };

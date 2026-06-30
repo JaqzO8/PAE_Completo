@@ -20,7 +20,7 @@ class ResourceController {
                 return res.status(404).json({ success: false, message: 'Comunidad no encontrada' });
             }
 
-            if (community.profesor_id !== userId) {
+            if (String(community.profesor_id) !== String(userId)) {
                 await fs.unlink(req.file.path);
                 return res.status(403).json({ success: false, message: 'Solo profesores pueden subir recursos' });
             }
@@ -90,7 +90,7 @@ class ResourceController {
                 return res.status(404).json({ success: false, message: 'Recurso no encontrado' });
             }
 
-            if (resource.profesor_id !== userId) {
+            if (String(resource.profesor_id) !== String(userId)) {
                 return res.status(403).json({ success: false, message: 'No autorizado' });
             }
 

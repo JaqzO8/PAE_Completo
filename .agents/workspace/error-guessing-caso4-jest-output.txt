@@ -1,0 +1,30 @@
+FAIL backend/services/exam-service/src/tests/liveAnswerRules.conditionCoverage.test.js
+  ● Cobertura de condiciones - hasAlreadyAnswered › caso_4_error_guessing_respuesta_corrupta_null_no_debe_romper_la_regla
+
+    expect(received).not.toThrow()
+
+    Error name:    "TypeError"
+    Error message: "Cannot read properties of null (reading 'userId')"
+
+           5 |
+           6 |     return answerList.some((answer) => (
+        >  7 |         String(answer.userId) === normalizedUserId &&
+             |                       ^
+           8 |         String(answer.questionId) === normalizedQuestionId
+           9 |     ));
+          10 | };
+
+      at userId (backend/services/exam-service/src/services/liveAnswerRules.js:7:23)
+                at Array.some (<anonymous>)
+      at some (backend/services/exam-service/src/services/liveAnswerRules.js:6:23)
+      at hasAlreadyAnswered (backend/services/exam-service/src/tests/liveAnswerRules.conditionCoverage.test.js:35:22)
+      at Object.<anonymous> (node_modules/expect/build/index.js:1824:9)
+      at Object.throwingMatcher [as toThrow] (node_modules/expect/build/index.js:2235:93)
+      at Object.toThrow (backend/services/exam-service/src/tests/liveAnswerRules.conditionCoverage.test.js:39:17)
+      at Object.toThrow (backend/services/exam-service/src/tests/liveAnswerRules.conditionCoverage.test.js:39:17)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 3 passed, 4 total
+Snapshots:   0 total
+Time:        0.285 s, estimated 1 s
+Ran all test suites matching backend/services/exam-service/src/tests/liveAnswerRules.conditionCoverage.test.js.

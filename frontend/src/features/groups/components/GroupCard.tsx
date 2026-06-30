@@ -1,7 +1,6 @@
 import { Users, Clock, Trash2, MoreVertical } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { 
-  Badge, 
   Button, 
   Avatar, 
   AvatarImage, 
@@ -24,7 +23,9 @@ export function GroupCard({ group, role, onDelete }: GroupCardProps) {
   const navigate = useNavigate();
   
   // Determinar el rol desde localStorage si no se proporciona
-  const userRole = role || (localStorage.getItem("role") as "docente" | "estudiante");
+  const storedUser = localStorage.getItem("user");
+  const storedRole = storedUser ? JSON.parse(storedUser).rol : undefined;
+  const userRole = role || (storedRole as "docente" | "estudiante") || "estudiante";
 
   const handleEnter = () => {
     const basePath = userRole === "docente" ? "/docente" : "/estudiante";

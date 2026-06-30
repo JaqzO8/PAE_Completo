@@ -1,0 +1,6 @@
+projectKey=Pae_Mod2
+serverUrl=http://localhost:9010
+serverVersion=26.5.0.122743
+dashboardUrl=http://localhost:9010/dashboard?id=Pae_Mod2
+ceTaskId=a1c7b2cd-fc57-4b75-bd9c-e097616f6656
+ceTaskUrl=http://localhost:9010/api/ce/task?id=a1c7b2cd-fc57-4b75-bd9c-e097616f6656

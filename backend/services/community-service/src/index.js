@@ -7,15 +7,25 @@ const config = require('./config/env');
 const { testConnection, syncDatabase } = require('./config/database');
 const routes = require('./routes');
 const { errorHandler, notFound } = require('./middlewares/errorMiddleware');
+const { seedCommunityDefaults } = require('./services/communitySeedService');
+const { repairCommunityDatabase } = require('./services/communityMaintenanceService');
 
 const app = express();
 
 app.set('trust proxy', 1);
 
+const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+const allowedOrigins = [
+    frontendUrl,
+    frontendUrl.replace('localhost', '127.0.0.1'),
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+];
+
 // Middlewares globales
 app.use(helmet());
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: allowedOrigins,
     credentials: true,
 }));
 app.use(express.json());
@@ -27,7 +37,7 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // Rate limiting
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 100,
+    max: Number(process.env.COMMUNITY_RATE_LIMIT_MAX || 3000),
     message: 'Demasiadas peticiones',
 });
 app.use('/api/community', limiter);
@@ -63,7 +73,9 @@ const startServer = async () => {
         const dbConnected = await testConnection();
         if (!dbConnected) throw new Error('DB connection failed');
 
-        await syncDatabase({ alter: config.NODE_ENV === 'development' });
+        await syncDatabase();
+        await repairCommunityDatabase();
+        await seedCommunityDefaults();
 
         app.listen(config.PORT, () => {
             console.log('✅ ========================================');

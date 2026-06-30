@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const config = require('../config/env');
 const { addToBlacklist, isBlacklisted } = require('../config/redis');
@@ -7,7 +8,7 @@ class TokenService {
      * Genera un JWT token
      */
     static generateToken(payload) {
-        return jwt.sign(payload, config.JWT_SECRET, {
+        return jwt.sign({ ...payload, jti: crypto.randomUUID() }, config.JWT_SECRET, {
             expiresIn: config.JWT_EXPIRES_IN,
         });
     }

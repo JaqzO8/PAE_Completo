@@ -12,7 +12,6 @@ import {
   SelectValue,
 } from "../../../desingSystem/primitives";
 import type { CreateRoomData } from "../services/learningService";
-import styles from "./learning.module.css";
 
 interface CreateRoomModalProps {
   onClose: () => void;

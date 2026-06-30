@@ -18,7 +18,7 @@ export const PublicRoute = () => {
   // Si YA está autenticado, lo mandamos a su casa (Dashboard)
   if (isAuthenticated && user) {
     if (user.rol === "docente") return <Navigate to="/docente" replace />;
-    if (user.rol === "estudiante") return <Navigate to="/estudiante/dashboard" replace />;
+    if (user.rol === "estudiante") return <Navigate to="/estudiante" replace />;
   }
 
   // Si NO está autenticado, le dejamos ver el Login/Registro

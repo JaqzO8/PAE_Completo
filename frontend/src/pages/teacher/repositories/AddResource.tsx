@@ -5,7 +5,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { ArrowLeft, Upload, Link as LinkIcon, FileText } from "lucide-react";
+import { ArrowLeft, Upload, FileText } from "lucide-react";
 import {
     Button, Input, Textarea, Select, SelectContent, SelectItem,
     SelectTrigger, SelectValue, Form, FormControl, FormField,

@@ -3,7 +3,47 @@ const path = require('path');
 const fs = require('fs').promises;
 const config = require('../config/env');
 
+const fileSizeField = Object.keys(Resource.rawAttributes).find((key) => (
+    key !== 'url_archivo' && key !== 'extension' && key.endsWith('_archivo')
+));
+
 class ResourceController {
+    static async _findDownloadableResource(id) {
+        return Resource.findOne({
+            where: { id_recurso: id, activo: true },
+            include: [{
+                model: Repository,
+                as: 'repositorio',
+                where: { activo: true, publico: true },
+            }],
+        });
+    }
+
+    static _getLocalFilePath(resource) {
+        if (!resource.url_archivo) {
+            return null;
+        }
+
+        const relativePath = resource.url_archivo.replace(/^\/?uploads\//, '');
+        const uploadRoot = path.resolve(config.UPLOAD_PATH);
+        const filePath = path.resolve(uploadRoot, relativePath);
+
+        if (!filePath.startsWith(uploadRoot)) {
+            return null;
+        }
+
+        return filePath;
+    }
+
+    static _applyUploadedFile(resourceData, file) {
+        resourceData.url_archivo = `/uploads/resources/${ResourceController._getSubfolder(file.mimetype)}/${file.filename}`;
+        resourceData.extension = path.extname(file.originalname);
+
+        if (fileSizeField) {
+            resourceData[fileSizeField] = file.size;
+        }
+    }
+
     /**
      * GET /api/content/resources
      * Listar recursos de un repositorio
@@ -27,12 +67,12 @@ class ResourceController {
                 order: [['orden', 'ASC'], ['fecha_subida', 'DESC']],
             });
 
-            res.status(200).json({
+            return res.status(200).json({
                 success: true,
                 data: resources,
             });
         } catch (error) {
-            next(error);
+            return next(error);
         }
     }
 
@@ -46,8 +86,8 @@ class ResourceController {
 
             const resource = await Resource.findOne({
                 where: { id_recurso: id, activo: true },
-                include: [{ 
-                    model: Repository, 
+                include: [{
+                    model: Repository,
                     as: 'repositorio',
                     attributes: ['id_repositorio', 'titulo', 'id_profesor'],
                 }],
@@ -60,12 +100,12 @@ class ResourceController {
                 });
             }
 
-            res.status(200).json({
+            return res.status(200).json({
                 success: true,
                 data: resource,
             });
         } catch (error) {
-            next(error);
+            return next(error);
         }
     }
 
@@ -76,16 +116,15 @@ class ResourceController {
     static async create(req, res, next) {
         try {
             const userId = req.user.id;
-            const { 
-                id_repositorio, 
-                titulo, 
-                descripcion, 
+            const {
+                id_repositorio,
+                titulo,
+                descripcion,
                 tipo_recurso,
                 url_externa,
                 orden,
             } = req.body;
 
-            // Validaciones
             if (!id_repositorio || !titulo || !tipo_recurso) {
                 return res.status(400).json({
                     success: false,
@@ -93,7 +132,6 @@ class ResourceController {
                 });
             }
 
-            // Verificar permisos
             const repository = await Repository.findOne({
                 where: { id_repositorio, id_profesor: userId, activo: true },
             });
@@ -110,19 +148,15 @@ class ResourceController {
                 titulo: titulo.trim(),
                 descripcion: descripcion?.trim() || null,
                 tipo_recurso,
-                orden: orden || 0,
+                orden: orden ? parseInt(orden, 10) : 0,
             };
 
-            // URL externa (RQ38: videos, audios, recursos externos)
             if (url_externa) {
                 resourceData.url_externa = url_externa;
             }
-            
-            // Archivo subido (RQ14: PDFs y otros)
+
             if (req.file) {
-                resourceData.url_archivo = `/uploads/resources/${ResourceController._getSubfolder(req.file.mimetype)}/${req.file.filename}`;
-                resourceData.tamaño_archivo = req.file.size;
-                resourceData.extension = path.extname(req.file.originalname);
+                ResourceController._applyUploadedFile(resourceData, req.file);
             } else if (!url_externa) {
                 return res.status(400).json({
                     success: false,
@@ -132,13 +166,13 @@ class ResourceController {
 
             const resource = await Resource.create(resourceData);
 
-            res.status(201).json({
+            return res.status(201).json({
                 success: true,
                 message: 'Recurso creado exitosamente',
                 data: resource,
             });
         } catch (error) {
-            next(error);
+            return next(error);
         }
     }
 
@@ -164,8 +198,7 @@ class ResourceController {
                 });
             }
 
-            // Verificar permisos
-            if (resource.repositorio.id_profesor !== userId) {
+            if (String(resource.repositorio.id_profesor) !== String(userId)) {
                 return res.status(403).json({
                     success: false,
                     message: 'No tienes permisos para editar este recurso',
@@ -175,35 +208,35 @@ class ResourceController {
             const updateData = {};
             if (titulo) updateData.titulo = titulo.trim();
             if (descripcion !== undefined) updateData.descripcion = descripcion?.trim() || null;
-            if (url_externa) updateData.url_externa = url_externa;
-            if (orden !== undefined) updateData.orden = parseInt(orden);
+            if (url_externa !== undefined) updateData.url_externa = url_externa || null;
+            if (orden !== undefined) updateData.orden = parseInt(orden, 10);
 
-            // Archivo nuevo
             if (req.file) {
-                // Eliminar archivo anterior
                 if (resource.url_archivo) {
-                    const oldPath = path.join(config.UPLOAD_PATH, resource.url_archivo.replace('/uploads/', ''));
-                    try {
-                        await fs.unlink(oldPath);
-                    } catch (err) {
-                        console.error('Error eliminando archivo anterior:', err);
+                    const oldPath = ResourceController._getLocalFilePath(resource);
+                    if (oldPath) {
+                        try {
+                            await fs.unlink(oldPath);
+                        } catch (err) {
+                            if (err.code !== 'ENOENT') {
+                                console.error('Error eliminando archivo anterior:', err);
+                            }
+                        }
                     }
                 }
 
-                updateData.url_archivo = `/uploads/resources/${ResourceController._getSubfolder(req.file.mimetype)}/${req.file.filename}`;
-                updateData.tamaño_archivo = req.file.size;
-                updateData.extension = path.extname(req.file.originalname);
+                ResourceController._applyUploadedFile(updateData, req.file);
             }
 
             await resource.update(updateData);
 
-            res.status(200).json({
+            return res.status(200).json({
                 success: true,
                 message: 'Recurso actualizado exitosamente',
                 data: resource,
             });
         } catch (error) {
-            next(error);
+            return next(error);
         }
     }
 
@@ -228,7 +261,7 @@ class ResourceController {
                 });
             }
 
-            if (resource.repositorio.id_profesor !== userId) {
+            if (String(resource.repositorio.id_profesor) !== String(userId)) {
                 return res.status(403).json({
                     success: false,
                     message: 'No tienes permisos para eliminar este recurso',
@@ -237,31 +270,23 @@ class ResourceController {
 
             await resource.update({ activo: false });
 
-            res.status(200).json({
+            return res.status(200).json({
                 success: true,
                 message: 'Recurso eliminado exitosamente',
             });
         } catch (error) {
-            next(error);
+            return next(error);
         }
     }
 
     /**
      * POST /api/content/resources/:id/download
-     * Descargar recurso (RQ43)
+     * Registrar y preparar descarga (RQ43)
      */
     static async download(req, res, next) {
         try {
             const { id } = req.params;
-
-            const resource = await Resource.findOne({
-                where: { id_recurso: id, activo: true },
-                include: [{ 
-                    model: Repository, 
-                    as: 'repositorio',
-                    where: { activo: true, publico: true },
-                }],
-            });
+            const resource = await ResourceController._findDownloadableResource(id);
 
             if (!resource) {
                 return res.status(404).json({
@@ -270,20 +295,18 @@ class ResourceController {
                 });
             }
 
-            // Incrementar contador de descargas
             await resource.increment('descargas');
             await resource.repositorio.increment('cantidad_descargas');
 
-            // Si es enlace externo
             if (resource.url_externa) {
                 return res.status(200).json({
                     success: true,
                     type: 'external',
                     url: resource.url_externa,
+                    filename: resource.titulo,
                 });
             }
 
-            // ✅ CORRECCIÓN: Verificar que url_archivo exista
             if (!resource.url_archivo) {
                 return res.status(404).json({
                     success: false,
@@ -291,38 +314,82 @@ class ResourceController {
                 });
             }
 
-            // Si es archivo local
-            const filePath = path.join(config.UPLOAD_PATH, resource.url_archivo.replace('/uploads/', ''));
-            
-            console.log('📥 Intentando descargar archivo desde:', filePath);
+            const filePath = ResourceController._getLocalFilePath(resource);
+
+            if (!filePath) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Ruta de archivo invalida',
+                });
+            }
 
             try {
                 await fs.access(filePath);
             } catch (error) {
-                console.error('❌ Archivo no encontrado:', filePath);
                 return res.status(404).json({
                     success: false,
                     message: 'Archivo no encontrado en el servidor',
                 });
             }
 
-            // ✅ CORRECCIÓN: Usar sendFile en lugar de download para mejor compatibilidad
-            res.sendFile(filePath, (err) => {
-                if (err) {
-                    console.error('❌ Error enviando archivo:', err);
-                    next(err);
-                }
+            return res.status(200).json({
+                success: true,
+                type: 'file',
+                downloadUrl: `/content/resources/${resource.id_recurso}/file`,
+                filename: `${resource.titulo}${resource.extension || ''}`,
             });
-
         } catch (error) {
-            console.error('❌ Error en download:', error);
-            next(error);
+            return next(error);
         }
     }
 
     /**
-     * Método auxiliar para determinar subcarpeta según MIME type
+     * GET /api/content/resources/:id/file
+     * Enviar archivo local autenticado
      */
+    static async streamFile(req, res, next) {
+        try {
+            const { id } = req.params;
+            const resource = await ResourceController._findDownloadableResource(id);
+
+            if (!resource || !resource.url_archivo) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Archivo no encontrado',
+                });
+            }
+
+            const filePath = ResourceController._getLocalFilePath(resource);
+
+            if (!filePath) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Ruta de archivo invalida',
+                });
+            }
+
+            try {
+                await fs.access(filePath);
+            } catch (error) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Archivo no encontrado en el servidor',
+                });
+            }
+
+            const filename = `${resource.titulo}${resource.extension || ''}`.replace(/[^\w.\- ]+/g, '_');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+            return res.sendFile(filePath, (err) => {
+                if (err) {
+                    next(err);
+                }
+            });
+        } catch (error) {
+            return next(error);
+        }
+    }
+
     static _getSubfolder(mimetype) {
         if (mimetype.startsWith('application/pdf')) return 'pdfs';
         if (mimetype.startsWith('video/')) return 'videos';

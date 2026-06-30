@@ -6,6 +6,9 @@ const DesafioSemanal = require('./DesafioSemanal');
 const InvitacionComunidad = require('./InvitacionComunidad');
 const Amistad = require('./Amistad');
 const ReporteComunidad = require('./ReporteComunidad');
+const CommunitySetting = require('./CommunitySetting');
+const WellbeingContent = require('./WellbeingContent');
+const UniversityNews = require('./UniversityNews');
 
 // Relaciones
 Comunidad.hasMany(MiembroComunidad, { foreignKey: 'comunidad_id', as: 'miembros' });
@@ -35,4 +38,7 @@ module.exports = {
     InvitacionComunidad,
     Amistad,
     ReporteComunidad,
+    CommunitySetting,
+    WellbeingContent,
+    UniversityNews,
 };

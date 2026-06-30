@@ -1,6 +1,7 @@
 // src/pages/learning/ExamResults.tsx
+import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Trophy, Clock, Target, TrendingUp, CheckCircle, XCircle, Home } from "lucide-react";
+import { Trophy, Clock, Target, TrendingUp, CheckCircle, XCircle, Home, BookmarkPlus, Medal } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -10,14 +11,19 @@ import {
   Badge,
   Separator,
 } from "../../desingSystem/primitives";
-import type { SimulacroScore } from "../../features/learning/services/learningService";
+import { saveQuestion, type SimulacroScore } from "../../features/learning/services/learningService";
+import { useToast } from "../../hooks/useToast";
 import styles from "../../features/learning/components/learning.module.css";
 
 const ExamResults = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [savedQuestionIds, setSavedQuestionIds] = useState<Set<string>>(new Set());
   
   const result = location.state?.result as SimulacroScore | undefined;
+  const userRole = localStorage.getItem("role") as "docente" | "estudiante" | null;
+  const basePath = userRole === "estudiante" ? "/estudiante" : "/docente";
 
   if (!result) {
     return (
@@ -27,7 +33,7 @@ const ExamResults = () => {
           <p className="text-muted-foreground mb-4">
             No hay resultados para mostrar.
           </p>
-          <Button onClick={() => navigate("/docente/aprendizaje/simulacros")}>
+          <Button onClick={() => navigate(`${basePath}/aprendizaje/simulacros`)}>
             Volver a Simulacros
           </Button>
         </Card>
@@ -43,6 +49,8 @@ const ExamResults = () => {
   };
 
   const getPerformanceMessage = () => {
+    if (result.offlinePending) return "Tu intento quedo guardado en este dispositivo y se sincronizara al recuperar conexion.";
+    if (result.requiresManualReview) return "Tu resultado parcial fue registrado. Un docente revisara las respuestas abiertas.";
     if (percentage >= 90) return "¡Excelente! Dominas estos temas a la perfección.";
     if (percentage >= 75) return "¡Muy bien! Estás en buen camino hacia tu meta.";
     if (percentage >= 60) return "Buen trabajo. Con más práctica mejorarás aún más.";
@@ -56,10 +64,35 @@ const ExamResults = () => {
     return "text-red-600";
   };
 
+  const handleSaveQuestion = async (questionId: string) => {
+    try {
+      await saveQuestion(questionId);
+      setSavedQuestionIds((current) => new Set(current).add(questionId));
+      toast({ title: "Pregunta guardada", description: "La agregamos a tu repaso personal" });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "No se pudo guardar",
+        description: error.response?.data?.message || "Intenta nuevamente",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-neutral-50 py-12">
       <div className="max-w-6xl mx-auto px-4">
         {/* Header con Puntaje Principal */}
+        {result.offlinePending && (
+          <Card className="mb-6 border-orange-200 bg-orange-50">
+            <CardContent className="p-4">
+              <p className="font-semibold text-orange-800">Envio pendiente de sincronizacion</p>
+              <p className="text-sm text-orange-700">
+                Puedes cerrar esta pantalla. PAE intentara enviar el resultado automaticamente cuando vuelva la conexion.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
         <Card className="mb-8 overflow-hidden">
           <div className="bg-gradient-to-r from-brand-action to-blue-600 p-8 text-white">
             <div className="flex items-center justify-center mb-4">
@@ -150,6 +183,26 @@ const ExamResults = () => {
           </CardContent>
         </Card>
 
+        {result.newAchievements && result.newAchievements.length > 0 && (
+          <Card className="mb-8 border-amber-200 bg-amber-50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-amber-950">
+                <Medal className="h-5 w-5" />
+                Logros desbloqueados
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3 md:grid-cols-2">
+              {result.newAchievements.map((achievement) => (
+                <div key={achievement.id} className="rounded-md border border-amber-200 bg-white p-4">
+                  <p className="font-semibold text-primary-contrast">{achievement.title}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{achievement.description}</p>
+                  <p className="mt-2 text-xs font-semibold text-amber-700">+{achievement.points} puntos</p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Solucionario Detallado */}
         <Card>
           <CardHeader>
@@ -161,60 +214,84 @@ const ExamResults = () => {
           <CardContent className="space-y-6">
             {result.solutions.map((solution, index) => (
               <div key={solution.question.id} className={styles.solutionCard}>
-                <div className="flex items-start gap-3 mb-4">
-                  <Badge
-                    className={
-                      solution.isCorrect
-                        ? "bg-green-100 text-green-700"
-                        : "bg-red-100 text-red-700"
-                    }
+                <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div className="flex flex-wrap items-start gap-3">
+                    <Badge
+                      className={
+                        solution.requiresManualReview
+                          ? "bg-blue-100 text-blue-700"
+                          : solution.isCorrect
+                          ? "bg-green-100 text-green-700"
+                          : "bg-red-100 text-red-700"
+                      }
+                    >
+                      {solution.requiresManualReview ? (
+                        <Clock className="h-3 w-3 mr-1" />
+                      ) : solution.isCorrect ? (
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                      ) : (
+                        <XCircle className="h-3 w-3 mr-1" />
+                      )}
+                      {solution.requiresManualReview ? "Por revisar" : solution.isCorrect ? "Correcta" : "Incorrecta"}
+                    </Badge>
+                    <Badge variant="outline">{solution.question.subject}</Badge>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleSaveQuestion(solution.question.id)}
+                    disabled={savedQuestionIds.has(solution.question.id)}
                   >
-                    {solution.isCorrect ? (
-                      <CheckCircle className="h-3 w-3 mr-1" />
-                    ) : (
-                      <XCircle className="h-3 w-3 mr-1" />
-                    )}
-                    {solution.isCorrect ? "Correcta" : "Incorrecta"}
-                  </Badge>
-                  <Badge variant="outline">{solution.question.subject}</Badge>
+                    <BookmarkPlus className="h-4 w-4" />
+                    {savedQuestionIds.has(solution.question.id) ? "Guardada" : "Guardar"}
+                  </Button>
                 </div>
 
                 <h3 className={styles.solutionQuestion}>
                   {index + 1}. {solution.question.question}
                 </h3>
 
-                <div className={styles.solutionOptions}>
-                  {solution.question.options.map((option, optIndex) => {
-                    const isCorrect = optIndex === solution.question.correctAnswer;
-                    const isUserAnswer = optIndex === solution.userAnswer;
+                {solution.question.type === "abierta" ? (
+                  <div className="rounded-md border bg-neutral-50 p-4">
+                    <p className="text-xs font-semibold uppercase text-muted-foreground">Tu respuesta</p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">
+                      {solution.userAnswer || "Sin respuesta"}
+                    </p>
+                  </div>
+                ) : (
+                  <div className={styles.solutionOptions}>
+                    {solution.question.options.map((option, optIndex) => {
+                      const isCorrect = optIndex === solution.question.correctAnswer;
+                      const isUserAnswer = optIndex === solution.userAnswer;
 
-                    return (
-                      <div
-                        key={optIndex}
-                        className={`${styles.solutionOption} ${
-                          isCorrect ? styles.solutionOptionCorrect : ""
-                        } ${
-                          isUserAnswer && !isCorrect
-                            ? styles.solutionOptionIncorrect
-                            : ""
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <div className="font-bold">
-                            {String.fromCharCode(65 + optIndex)}.
+                      return (
+                        <div
+                          key={optIndex}
+                          className={`${styles.solutionOption} ${
+                            isCorrect ? styles.solutionOptionCorrect : ""
+                          } ${
+                            isUserAnswer && !isCorrect
+                              ? styles.solutionOptionIncorrect
+                              : ""
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className="font-bold">
+                              {String.fromCharCode(65 + optIndex)}.
+                            </div>
+                            <span>{option}</span>
                           </div>
-                          <span>{option}</span>
+                          {isCorrect && (
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                          )}
+                          {isUserAnswer && !isCorrect && (
+                            <XCircle className="h-4 w-4 text-red-600" />
+                          )}
                         </div>
-                        {isCorrect && (
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                        )}
-                        {isUserAnswer && !isCorrect && (
-                          <XCircle className="h-4 w-4 text-red-600" />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
 
                 {/* Explicación */}
                 <div className={styles.solutionExplanation}>
@@ -231,7 +308,7 @@ const ExamResults = () => {
           <Button
             size="lg"
             variant="outline"
-            onClick={() => navigate("/docente/aprendizaje/simulacros")}
+            onClick={() => navigate(`${basePath}/aprendizaje/simulacros`)}
             className="gap-2"
           >
             <Home className="h-4 w-4" />
@@ -240,7 +317,7 @@ const ExamResults = () => {
           <Button
             size="lg"
             className="bg-brand-action hover:bg-brand-action/90 gap-2"
-            onClick={() => window.location.reload()}
+            onClick={() => navigate(`${basePath}/aprendizaje/simulacros`)}
           >
             <Trophy className="h-4 w-4" />
             Intentar Nuevo Simulacro

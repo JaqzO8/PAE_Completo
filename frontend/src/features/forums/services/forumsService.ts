@@ -142,7 +142,7 @@ const getMyForumsMock = async (): Promise<ForumPost[]> => {
   return new Promise((resolve) => setTimeout(() => resolve(myForums), 800));
 };
 
-const getForumDetailMock = async (id: string): Promise<ForumDetail> => {
+const getForumDetailMock = async (_id: string): Promise<ForumDetail> => {
   return new Promise((resolve) => setTimeout(() => resolve(MOCK_FORUM_DETAIL), 600));
 };
 
@@ -163,11 +163,11 @@ const createForumMock = async (data: CreateForumData): Promise<ForumPost> => {
   return new Promise((resolve) => setTimeout(() => resolve(newForum), 1000));
 };
 
-const likeForumMock = async (forumId: string): Promise<void> => {
+const likeForumMock = async (_forumId: string): Promise<void> => {
   return new Promise((resolve) => setTimeout(() => resolve(), 300));
 };
 
-const reportForumMock = async (forumId: string, reason: string): Promise<void> => {
+const reportForumMock = async (_forumId: string, _reason: string): Promise<void> => {
   return new Promise((resolve) => setTimeout(() => resolve(), 500));
 };
 

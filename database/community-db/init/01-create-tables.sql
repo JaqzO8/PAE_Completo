@@ -188,6 +188,7 @@ BEGIN
         UPDATE comunidades 
         SET puntos_prestigio = puntos_prestigio + 1 
         WHERE id_comunidad = NEW.comunidad_id;
+        RETURN NEW;
     END IF;
     
     -- Cada recurso suma 5 puntos
@@ -195,14 +196,17 @@ BEGIN
         UPDATE comunidades 
         SET puntos_prestigio = puntos_prestigio + 5 
         WHERE id_comunidad = NEW.comunidad_id;
+        RETURN NEW;
     END IF;
     
     -- Cada desafío completado suma 10 puntos
-    IF TG_OP = 'UPDATE' AND TG_TABLE_NAME = 'desafios_semanales' 
-       AND OLD.completado = FALSE AND NEW.completado = TRUE THEN
-        UPDATE comunidades 
-        SET puntos_prestigio = puntos_prestigio + 10 
-        WHERE id_comunidad = NEW.comunidad_id;
+    IF TG_OP = 'UPDATE' AND TG_TABLE_NAME = 'desafios_semanales' THEN
+        IF OLD.completado = FALSE AND NEW.completado = TRUE THEN
+            UPDATE comunidades
+            SET puntos_prestigio = puntos_prestigio + 10
+            WHERE id_comunidad = NEW.comunidad_id;
+        END IF;
+        RETURN NEW;
     END IF;
     
     RETURN NEW;

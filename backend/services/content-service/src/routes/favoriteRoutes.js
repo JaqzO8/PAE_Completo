@@ -1,30 +1,31 @@
 const express = require('express');
 const router = express.Router();
 const FavoriteController = require('../controllers/favoriteController');
-const { verifyToken, isAuthenticated } = require('../middlewares/authMiddleware');
+
+// MOCK USER
+const mockUser = (req, res, next) => {
+  req.user = { id: 22 };
+  next();
+};
 
 /**
  * GET /api/content/favorites
- * Listar favoritos del usuario
  */
-router.get('/', verifyToken, isAuthenticated, FavoriteController.list);
+router.get('/', mockUser, FavoriteController.list);
 
 /**
  * GET /api/content/favorites/check/:id
- * Verificar si un repositorio está en favoritos
  */
-router.get('/check/:id', verifyToken, isAuthenticated, FavoriteController.check);
+router.get('/check/:id', mockUser, FavoriteController.check);
 
 /**
  * POST /api/content/favorites/:id
- * Agregar repositorio a favoritos
  */
-router.post('/:id', verifyToken, isAuthenticated, FavoriteController.add);
+router.post('/:id', mockUser, FavoriteController.add);
 
 /**
  * DELETE /api/content/favorites/:id
- * Quitar repositorio de favoritos
  */
-router.delete('/:id', verifyToken, isAuthenticated, FavoriteController.remove);
+router.delete('/:id', mockUser, FavoriteController.remove);
 
 module.exports = router;

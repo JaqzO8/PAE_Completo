@@ -78,8 +78,53 @@
   * {
     @apply border-border;
   }
+  html[data-font-size="small"] {
+    font-size: 14px;
+  }
+  html[data-font-size="medium"] {
+    font-size: 16px;
+  }
+  html[data-font-size="large"] {
+    font-size: 18px;
+  }
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', sans-serif; /* <--- Esto arregla la letra fea */
+  }
+  html[data-motion="reduced"] *,
+  html[data-motion="reduced"] *::before,
+  html[data-motion="reduced"] *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+  html[data-contrast="high"] {
+    --border: 222 47% 18%;
+    --ring: 221 83% 45%;
+  }
+  html.dark body,
+  html.dark .bg-neutral-50 {
+    background-color: hsl(var(--background)) !important;
+    color: hsl(var(--foreground)) !important;
+  }
+  html.dark .bg-white,
+  html.dark .bg-neutral-white {
+    background-color: hsl(var(--card)) !important;
+  }
+  html.dark .text-primary-contrast,
+  html.dark .text-neutral-600 {
+    color: hsl(var(--foreground)) !important;
+  }
+  html.dark .text-muted-foreground,
+  html.dark .text-neutral-400 {
+    color: hsl(var(--muted-foreground)) !important;
+  }
+  html.dark .border-neutral-200,
+  html.dark .border-neutral-200\/60 {
+    border-color: hsl(var(--border)) !important;
+  }
+  html.dark .bg-neutral-100 {
+    background-color: hsl(var(--secondary)) !important;
   }
 }

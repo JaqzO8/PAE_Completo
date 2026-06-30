@@ -1,6 +1,57 @@
 const { MensajeCanal, MiembroComunidad, Comunidad } = require('../models');
 const axios = require('axios');
 const config = require('../config/env');
+const { redis } = require('../config/redis');
+
+const clampNumber = (value, min, max, fallback) => {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return fallback;
+    return Math.min(max, Math.max(min, Math.trunc(number)));
+};
+
+const getCachedUserInfo = async (userId, token) => {
+    const cacheKey = `auth:user:${userId}:public`;
+    try {
+        const cached = await redis.get(cacheKey);
+        if (cached) return JSON.parse(cached);
+    } catch (error) {
+        console.error('Error leyendo cache de usuario:', error.message);
+    }
+
+    try {
+        const response = await axios.get(
+            `${config.AUTH_SERVICE_URL}/api/auth/user/${userId}`,
+            {
+                headers: { Authorization: `Bearer ${token}` },
+                timeout: 2500,
+            }
+        );
+        const user = response.data.user;
+        try {
+            await redis.setex(cacheKey, config.USER_CACHE_TTL_SECONDS, JSON.stringify(user));
+        } catch (error) {
+            console.error('Error guardando cache de usuario:', error.message);
+        }
+        return user;
+    } catch (error) {
+        console.error(`Error obteniendo info del usuario ${userId}:`, error.message);
+        return null;
+    }
+};
+
+const checkMessageRate = async (userId) => {
+    const key = `rate:community:message:${userId}`;
+    try {
+        const count = await redis.incr(key);
+        if (count === 1) {
+            await redis.expire(key, config.MESSAGE_RATE_LIMIT_WINDOW_SECONDS);
+        }
+        return count <= config.MESSAGE_RATE_LIMIT_MAX;
+    } catch (error) {
+        console.error('Error validando rate limit de mensajes:', error.message);
+        return true;
+    }
+};
 
 class MessageController {
     /**
@@ -10,7 +61,8 @@ class MessageController {
     static async getMessages(req, res, next) {
         try {
             const { id } = req.params;
-            const { limit = 50, offset = 0 } = req.query;
+            const limit = clampNumber(req.query.limit, 1, 80, 50);
+            const offset = clampNumber(req.query.offset, 0, 5000, 0);
             const userId = req.user.id;
 
             // Verificar que el usuario es miembro
@@ -31,26 +83,20 @@ class MessageController {
 
             const messages = await MensajeCanal.findAll({
                 where: { comunidad_id: id },
-                order: [['fecha_envio', 'ASC']],
-                limit: parseInt(limit),
-                offset: parseInt(offset),
+                order: [['fecha_envio', 'DESC']],
+                limit,
+                offset,
             });
+            messages.reverse();
 
             // Obtener info de usuarios
             const userIds = [...new Set(messages.map(m => m.usuario_id))];
             const usersInfo = {};
 
-            for (const uid of userIds) {
-                try {
-                    const response = await axios.get(
-                        `${config.AUTH_SERVICE_URL}/api/auth/user/${uid}`,
-                        { headers: { Authorization: `Bearer ${req.token}` } }
-                    );
-                    usersInfo[uid] = response.data.user;
-                } catch (error) {
-                    console.error(`Error obteniendo info del usuario ${uid}:`, error.message);
-                }
-            }
+            const users = await Promise.all(userIds.map((uid) => getCachedUserInfo(uid, req.token)));
+            userIds.forEach((uid, index) => {
+                if (users[index]) usersInfo[uid] = users[index];
+            });
 
             const messagesData = messages.map(msg => ({
                 id: msg.id_mensaje,
@@ -82,19 +128,34 @@ class MessageController {
     static async sendMessage(req, res, next) {
         try {
             const { id } = req.params;
-            const { contenido } = req.body;
+            const contenido = String(req.body.contenido || '').trim();
             const userId = req.user.id;
 
-            if (!contenido || contenido.trim().length === 0) {
+            if (!contenido) {
                 return res.status(400).json({
                     success: false,
                     message: 'El mensaje no puede estar vacío',
                 });
             }
-            // Verificar que la comunidad existe y está activa
-        const community = await Comunidad.findOne({
-            where: { id_comunidad: id, activa: true },
-        });
+            if (contenido.length > 1000) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'El mensaje no puede superar 1000 caracteres',
+                });
+            }
+
+            const withinRateLimit = await checkMessageRate(userId);
+            if (!withinRateLimit) {
+                return res.status(429).json({
+                    success: false,
+                    message: 'Estas enviando mensajes demasiado rapido',
+                });
+            }
+
+            // Verificar que la comunidad existe y esta activa
+            const community = await Comunidad.findOne({
+                where: { id_comunidad: id, activa: true },
+            });
 
         if (!community) {
             return res.status(404).json({
@@ -122,21 +183,11 @@ class MessageController {
         const message = await MensajeCanal.create({
             comunidad_id: id,
             usuario_id: userId,
-            contenido: contenido.trim(),
+            contenido,
             fecha_envio: new Date(),
         });
 
-        // Obtener info del usuario
-        let userInfo = null;
-        try {
-            const response = await axios.get(
-                `${config.AUTH_SERVICE_URL}/api/auth/user/${userId}`,
-                { headers: { Authorization: `Bearer ${req.token}` } }
-            );
-            userInfo = response.data.user;
-        } catch (error) {
-            console.error('Error obteniendo info del usuario:', error.message);
-        }
+        const userInfo = await getCachedUserInfo(userId, req.token);
 
         res.status(201).json({
             success: true,
@@ -181,8 +232,8 @@ static async deleteMessage(req, res, next) {
 
         // Verificar permisos
         const community = await Comunidad.findByPk(id);
-        const isAuthor = message.usuario_id === userId;
-        const isTeacher = community.profesor_id === userId;
+        const isAuthor = String(message.usuario_id) === String(userId);
+        const isTeacher = String(community.profesor_id) === String(userId);
 
         if (!isAuthor && !isTeacher) {
             return res.status(403).json({

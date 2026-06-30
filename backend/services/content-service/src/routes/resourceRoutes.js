@@ -11,12 +11,6 @@ const { uploadSingle } = require('../middlewares/uploadMiddleware');
 router.get('/', ResourceController.list);
 
 /**
- * GET /api/content/resources/:id
- * Obtener un recurso por ID
- */
-router.get('/:id', ResourceController.getById);
-
-/**
  * POST /api/content/resources
  * Crear un nuevo recurso (solo docentes)
  */
@@ -29,8 +23,36 @@ router.post(
 );
 
 /**
+ * GET /api/content/resources/:id/file
+ * Descargar archivo local autenticado
+ */
+router.get(
+    '/:id/file',
+    verifyToken,
+    isAuthenticated,
+    ResourceController.streamFile
+);
+
+/**
+ * GET /api/content/resources/:id
+ * Obtener un recurso por ID
+ */
+router.get('/:id', ResourceController.getById);
+
+/**
+ * POST /api/content/resources/:id/download
+ * Registrar y preparar descarga
+ */
+router.post(
+    '/:id/download',
+    verifyToken,
+    isAuthenticated,
+    ResourceController.download
+);
+
+/**
  * PUT /api/content/resources/:id
- * Actualizar recurso (solo docente dueño)
+ * Actualizar recurso (solo docente dueno)
  */
 router.put(
     '/:id',
@@ -42,24 +64,13 @@ router.put(
 
 /**
  * DELETE /api/content/resources/:id
- * Eliminar recurso (solo docente dueño)
+ * Eliminar recurso (solo docente dueno)
  */
 router.delete(
     '/:id',
     verifyToken,
     isTeacher,
     ResourceController.delete
-);
-
-/**
- * POST /api/content/resources/:id/download
- * Descargar recurso
- */
-router.post(
-    '/:id/download',
-    verifyToken,
-    isAuthenticated,
-    ResourceController.download
 );
 
 module.exports = router;

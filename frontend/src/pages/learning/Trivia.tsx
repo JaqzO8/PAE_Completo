@@ -1,6 +1,6 @@
 // src/pages/learning/Trivia.tsx
 import { useState } from "react";
-import { Zap, Plus, Users, Clock, Trophy, Search } from "lucide-react";
+import { Zap, Plus, Users, Clock, Trophy, Search, Play } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -10,17 +10,17 @@ import {
   Button,
   Input,
   Skeleton,
-  Badge,
   Avatar,
   AvatarImage,
   AvatarFallback,
 } from "../../desingSystem/primitives";
 import { useTrivia } from "../../features/learning/hooks/useLearning";
 import { CreateTriviaRoomModal } from "../../features/learning/components/CreateTriviaRoomModal";
+import { LiveGamePanel } from "../../features/learning/components/LiveGamePanel";
 import styles from "../../features/learning/components/learning.module.css";
 
 const Trivia = () => {
-  const { rooms, isLoading, createRoom, joinRoom } = useTrivia();
+  const { rooms, activeGame, isLoading, createRoom, joinRoom, openGame, answerQuestion, nextQuestion } = useTrivia();
   const [searchQuery, setSearchQuery] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
 
@@ -108,6 +108,16 @@ const Trivia = () => {
           </div>
         </CardContent>
       </Card>
+
+      {activeGame && (
+        <LiveGamePanel
+          game={activeGame}
+          titleIconClassName="text-purple-600"
+          optionAccentClassName="bg-purple-50 text-purple-700"
+          onAnswer={answerQuestion}
+          onNext={nextQuestion}
+        />
+      )}
 
       {/* Buscador */}
       <div className="relative">
@@ -197,7 +207,7 @@ const Trivia = () => {
                   </div>
 
                   <Button
-                   variant="brand"
+                    variant="brand"
                     className={`
                       ${styles.roomJoinButton}
                       disabled:!bg-brand-action/50
@@ -215,6 +225,15 @@ const Trivia = () => {
                       : room.status === "playing"
                       ? "Partida en Curso"
                       : "Sala Llena"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full gap-2"
+                    onClick={() => openGame(room.id)}
+                    disabled={room.status === "finished"}
+                  >
+                    <Play className="h-4 w-4" />
+                    {room.status === "playing" ? "Abrir trivia" : "Iniciar trivia"}
                   </Button>
                 </CardContent>
               </Card>

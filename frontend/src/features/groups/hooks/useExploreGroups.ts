@@ -35,9 +35,10 @@ export const useExploreGroups = () => {
     try {
       const response = await joinGroup(request);
       toast({
-        title: "Solicitud enviada",
+        title: "Te uniste a la comunidad",
         description: response.message,
       });
+      setGroups((prev) => prev.filter((group) => group.id !== request.groupId));
       return response;
     } catch (error) {
       toast({

@@ -1,4 +1,4 @@
-import { TeacherGroupList } from "../../features/groups/components/TeacherGroupList";
+import { TeacherGroupList } from "../../../features/groups/components/TeacherGroupList";
 
 const TeacherGroupsPage = () => {
   return <TeacherGroupList />;

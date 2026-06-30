@@ -11,6 +11,7 @@ import {
 } from "../../../desingSystem/primitives";
 import { useToast } from "../../../hooks/useToast";
 import { getRepositoryById, type Repository } from "../../../features/repository/services/repositoryService";
+import { getLessonsByRepository, type Lesson } from "../../../features/lessons/services/lessonService";
 import { api } from "../../../services/api";
 
 interface Resource {
@@ -40,6 +41,7 @@ const StudentRepositoryDetail = () => {
 
     const [repository, setRepository] = useState<Repository | null>(null);
     const [resources, setResources] = useState<Resource[]>([]);
+    const [lessons, setLessons] = useState<Lesson[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isFavorite, setIsFavorite] = useState(false);
 
@@ -57,12 +59,14 @@ const StudentRepositoryDetail = () => {
                 getRepositoryById(id),
                 api.get("/content/resources", { params: { repositorio_id: id } })
             ]);
+            const lessonData = await getLessonsByRepository(id);
 
             console.log("🖼️ Repositorio cargado:", repoData);
             console.log("📷 Cover Image URL:", repoData.coverImage);
 
             setRepository(repoData);
             setResources(resourcesResponse.data.data);
+            setLessons(lessonData);
             setIsFavorite(repoData.isFavorite);
         } catch (error: any) {
             console.error("Error cargando repositorio:", error);
@@ -101,7 +105,6 @@ const StudentRepositoryDetail = () => {
     const handleDownload = async (resourceId: number) => {
         try {
             // 1. Registrar la descarga en el backend
-            await api.post(`/content/resources/${resourceId}/download`);
 
             // 2. Obtener el recurso
             const resource = resources.find(r => r.id_recurso === resourceId);
@@ -110,38 +113,37 @@ const StudentRepositoryDetail = () => {
                 throw new Error("Recurso no encontrado");
             }
 
+            const response = await api.post(`/content/resources/${resourceId}/download`);
+            const download = response.data;
+
             console.log("📥 Descargando recurso:", resource);
 
             // 3. Determinar la URL según el tipo
-            if (resource.url_externa) {
+            if (download.type === "external" && download.url) {
                 // Enlaces externos
-                window.open(resource.url_externa, "_blank");
-            } else if (resource.url_archivo) {
+                window.open(download.url, "_blank", "noopener,noreferrer");
+            } else if (download.type === "file" && download.downloadUrl) {
                 // Archivos locales en /uploads
-                const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3000';
-                
-                // Asegurar que la ruta empiece con /
-                const path = resource.url_archivo.startsWith('/') 
-                    ? resource.url_archivo 
-                    : `/${resource.url_archivo}`;
-                
-                const downloadUrl = `${baseUrl}${path}`;
-                
-                console.log("🔗 URL de descarga:", downloadUrl);
-                
+                const fileResponse = await api.get(download.downloadUrl, {
+                    responseType: "blob",
+                });
+                const blobUrl = window.URL.createObjectURL(fileResponse.data);
+
                 // Crear un enlace temporal para forzar descarga
                 const link = document.createElement('a');
-                link.href = downloadUrl;
-                link.download = resource.titulo;
-                link.target = '_blank';
+                link.href = blobUrl;
+                link.download = download.filename || resource.titulo;
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
+                window.URL.revokeObjectURL(blobUrl);
+            } else {
+                throw new Error("El servidor no devolvio una descarga valida");
             }
 
-            toast({ 
-                title: "Descarga iniciada",
-                description: `Descargando: ${resource.titulo}`
+            toast({
+                title: download.type === "external" ? "Recurso abierto" : "Descarga iniciada",
+                description: resource.titulo
             });
 
             // Actualizar contador localmente
@@ -294,6 +296,58 @@ const StudentRepositoryDetail = () => {
             </Card>
 
             {/* Recursos */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <BookOpen className="h-5 w-5 text-brand-action" />
+                        Lecciones ({lessons.length})
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {lessons.length === 0 ? (
+                        <div className="text-center py-12 border-2 border-dashed rounded-xl">
+                            <BookOpen className="h-12 w-12 mx-auto mb-4 text-neutral-300" />
+                            <p className="text-muted-foreground">No hay lecciones disponibles</p>
+                        </div>
+                    ) : (
+                        <div className="grid gap-3 md:grid-cols-2">
+                            {lessons.map((lesson) => {
+                                const progress = lesson.progresos?.[0];
+                                return (
+                                    <Card key={lesson.id_leccion} className="hover:shadow-md transition-shadow">
+                                        <CardContent className="p-4">
+                                            <div className="flex items-start gap-3">
+                                                <div className="p-2 bg-brand-action/10 rounded-lg">
+                                                    <BookOpen className="h-5 w-5 text-brand-action" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <h3 className="font-semibold text-primary-contrast">{lesson.titulo}</h3>
+                                                    {lesson.descripcion && (
+                                                        <p className="text-sm text-muted-foreground mt-1">{lesson.descripcion}</p>
+                                                    )}
+                                                    <div className="flex flex-wrap gap-2 mt-3 text-xs text-muted-foreground">
+                                                        <Badge variant="outline">{lesson.dificultad}</Badge>
+                                                        <Badge variant={progress?.completada ? "default" : "secondary"}>
+                                                            {progress?.completada ? "Completada" : `${lesson.duracion_minutos} min`}
+                                                        </Badge>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <Button
+                                                className="mt-4 w-full bg-brand-action hover:bg-brand-action/90"
+                                                onClick={() => navigate(`/estudiante/repositorios/${id}/lecciones/${lesson.id_leccion}`)}
+                                            >
+                                                Abrir leccion
+                                            </Button>
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">

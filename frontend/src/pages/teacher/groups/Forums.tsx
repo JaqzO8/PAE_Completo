@@ -1,7 +1,7 @@
 // src/pages/teacher/groups/Forums.tsx
 import { useState } from "react";
 import { MessageSquare, Search, Filter } from "lucide-react";
-import { Input, Button, Skeleton, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../desingSystem/primitives";
+import { Input, Skeleton, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../desingSystem/primitives";
 import { ForumCard } from "../../../features/forums/components/ForumCard";
 import { ForumDetailModal } from "../../../features/forums/components/ForumDetailModal";
 import { useForums } from "../../../features/forums/hooks/useForums";

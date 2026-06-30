@@ -36,7 +36,7 @@ export interface UpdateProfileData {
 }
 
 export interface UpdatePasswordData {
-  currentPassword: string;
+  currentPassword?: string;
   newPassword: string;
   confirmPassword: string;
 }
@@ -178,8 +178,17 @@ const updateProfileApi = async (data: UpdateProfileData): Promise<UserProfile> =
 
 const updatePasswordApi = async (data: UpdatePasswordData): Promise<void> => {
   await authServices.updatePassword({
+    currentPassword: data.currentPassword || "",
     newPassword: data.newPassword,
   });
+};
+
+const getStatsApi = async (): Promise<ProfileStats> => {
+  const achievements = await api.get<{ data: unknown[] }>("/learning/achievements");
+  return {
+    ...MOCK_STATS,
+    achievementsCount: achievements.data.data.length,
+  };
 };
 
 // ========== EXPORTACIONES CON FALLBACK ==========
@@ -204,8 +213,7 @@ export const getStats = async (): Promise<ProfileStats> => {
   }
 
   try {
-    // TODO: Implementar endpoint de stats en el backend
-    return getStatsMock();
+    return await getStatsApi();
   } catch (error) {
     console.warn("🔴 API Error (Profile Stats), usando mock", error);
     return getStatsMock();
@@ -219,8 +227,16 @@ export const getSessions = async (): Promise<SessionInfo[]> => {
   }
 
   try {
-    // TODO: Implementar endpoint de sessions en el backend
-    return getSessionsMock();
+    const sessions = await authServices.getSessions();
+    return sessions.map((session) => ({
+      device: session.device,
+      location: session.location,
+      lastActive: new Intl.DateTimeFormat("es-PE", {
+        dateStyle: "short",
+        timeStyle: "short",
+      }).format(new Date(session.lastActive)),
+      isCurrent: session.isCurrent,
+    }));
   } catch (error) {
     console.warn("🔴 API Error (Sessions), usando mock", error);
     return getSessionsMock();
@@ -272,8 +288,7 @@ export const logoutAllSessions = async (): Promise<void> => {
   }
 
   try {
-    // TODO: Implementar endpoint de logout all sessions
-    return logoutAllSessionsMock();
+    await authServices.logoutAllSessions();
   } catch (error) {
     console.warn("🔴 API Error (Logout All), usando mock", error);
     return logoutAllSessionsMock();

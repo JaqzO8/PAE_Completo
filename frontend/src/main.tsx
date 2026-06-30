@@ -9,3 +9,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <AppRouter />
   </React.StrictMode>,
 );
+
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/pae-sw.js').catch((error) => {
+      console.warn('No se pudo registrar el soporte offline de PAE.', error);
+    });
+  });
+}

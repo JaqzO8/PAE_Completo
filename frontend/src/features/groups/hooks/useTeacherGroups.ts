@@ -1,6 +1,11 @@
 // src/features/groups/hooks/useTeacherGroups.ts
 import { useState, useEffect } from "react";
-import { getTeacherGroups, type Group } from "../services/groupsService";
+import {
+  createGroup as createGroupRequest,
+  deleteGroup as deleteGroupRequest,
+  getTeacherGroups,
+  type Group,
+} from "../services/groupsService";
 import { useToast } from "../../../hooks/useToast";
 
 export const useTeacherGroups = () => {
@@ -28,10 +33,23 @@ export const useTeacherGroups = () => {
     loadGroups();
   }, []);
 
-  const deleteGroup = (id: string) => {
+  const createGroup = async (data: {
+    name: string;
+    description?: string;
+    subject?: string;
+    isPublic?: boolean;
+  }) => {
+    const group = await createGroupRequest(data);
+    setGroups((prev) => [group, ...prev]);
+    toast({ title: "Comunidad creada", description: "Ya puedes invitar estudiantes y conversar." });
+    return group;
+  };
+
+  const deleteGroup = async (id: string) => {
+    await deleteGroupRequest(id);
     setGroups((prev) => prev.filter((g) => g.id !== id));
     toast({ title: "Grupo eliminado", description: "La comunidad ha sido cerrada." });
   };
 
-  return { groups, isLoading, deleteGroup, refresh: loadGroups };
+  return { groups, isLoading, createGroup, deleteGroup, refresh: loadGroups };
 };

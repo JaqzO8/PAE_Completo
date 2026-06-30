@@ -4,7 +4,7 @@ import type { SimulacroResult } from "../features/learning/services/learningServ
 
 interface ExamState {
   simulacro: SimulacroResult;
-  answers: (number | null)[];
+  answers: (number | string | null)[];
   currentQuestionIndex: number;
   timeRemaining: number;
   markedForReview: number[];

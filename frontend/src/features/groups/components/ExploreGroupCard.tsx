@@ -1,7 +1,7 @@
 // src/features/groups/components/ExploreGroupCard.tsx
 import { useState } from "react";
 import { Users, Clock } from "lucide-react";
-import { Badge, Button, Avatar, AvatarImage, AvatarFallback } from "../../../desingSystem/primitives";
+import { Button, Avatar, AvatarImage, AvatarFallback } from "../../../desingSystem/primitives";
 import type { Group } from "../services/groupsService";
 import styles from "./groups.module.css";
 
@@ -37,7 +37,7 @@ export function ExploreGroupCard({ group, onJoinRequest, isJoining }: ExploreGro
 
       <div>
         <span className={styles.groupSubject}>{group.subject}</span>
-        <span className={styles.groupSubject}>{group.subject}</span>        <h3 className={styles.groupTitle}>{group.name}</h3>
+        <h3 className={styles.groupTitle}>{group.name}</h3>
       </div>
 
       <div className={styles.groupMeta}>
@@ -72,7 +72,7 @@ export function ExploreGroupCard({ group, onJoinRequest, isJoining }: ExploreGro
           onClick={handleJoin}
         disabled={isJoining || requested}
       >
-        {requested ? "Solicitud Enviada" : "Solicitar Unirse"}
+        {requested ? "Unido" : "Unirse"}
       </Button>
     </div>
   );

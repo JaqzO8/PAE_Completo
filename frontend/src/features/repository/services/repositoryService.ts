@@ -48,7 +48,9 @@ const getFullImageUrl = (imagePath?: string): string | undefined => {
   }
   
   // Construir URL completa
-  const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3000';
+  const baseUrl = import.meta.env.VITE_API_URL?.startsWith('http')
+    ? import.meta.env.VITE_API_URL.replace('/api', '')
+    : window.location.origin;
   
   // Si la ruta ya empieza con /, no duplicarla
   const path = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;

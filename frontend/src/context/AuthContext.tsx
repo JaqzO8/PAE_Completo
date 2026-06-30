@@ -66,6 +66,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setToken(storedToken);
             setUser(verification.user);
             localStorage.setItem('user', JSON.stringify(verification.user));
+            localStorage.setItem('role', verification.user.rol);
           } else {
             // Token inválido, limpiar storage
             clearAuthData();
@@ -87,6 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const clearAuthData = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('role');
     setUser(null);
     setToken(null);
   };
@@ -99,6 +101,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setToken(authToken);
     localStorage.setItem('token', authToken);
     localStorage.setItem('user', JSON.stringify(userData));
+    localStorage.setItem('role', userData.rol);
   }, []);
 
   // ========================================
@@ -122,6 +125,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setToken(response.token);
       localStorage.setItem('token', response.token);
       localStorage.setItem('user', JSON.stringify(response.user));
+      localStorage.setItem('role', response.user.rol);
 
       console.log('💾 AuthContext: Datos guardados en localStorage');
 
@@ -199,6 +203,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updatedUser = { ...user, ...data };
     setUser(updatedUser);
     localStorage.setItem('user', JSON.stringify(updatedUser));
+    localStorage.setItem('role', updatedUser.rol);
   }, [user]);
 
   // ========================================

@@ -1,6 +1,6 @@
 // src/pages/learning/Desafios.tsx
 import { useState } from "react";
-import { Gamepad2, Plus, Users, Clock, Zap, Search } from "lucide-react";
+import { Gamepad2, Plus, Users, Clock, Zap, Search, Play } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -17,10 +17,11 @@ import {
 } from "../../desingSystem/primitives";
 import { useChallenges } from "../../features/learning/hooks/useLearning";
 import { CreateRoomModal } from "../../features/learning/components/CreateRoomModal";
+import { LiveGamePanel } from "../../features/learning/components/LiveGamePanel";
 import styles from "../../features/learning/components/learning.module.css";
 
 const Desafios = () => {
-  const { rooms, isLoading, createRoom, joinRoom } = useChallenges();
+  const { rooms, activeGame, isLoading, createRoom, joinRoom, startGame, answerQuestion, nextQuestion } = useChallenges();
   const [searchQuery, setSearchQuery] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
 
@@ -108,6 +109,14 @@ const Desafios = () => {
           </div>
         </CardContent>
       </Card>
+
+      {activeGame && (
+        <LiveGamePanel
+          game={activeGame}
+          onAnswer={answerQuestion}
+          onNext={nextQuestion}
+        />
+      )}
 
       {/* Buscador */}
       <div className="relative">
@@ -224,6 +233,15 @@ const Desafios = () => {
                     : room.status === "playing"
                     ? "Partida en Curso"
                     : "Sala Llena"}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full gap-2"
+                  onClick={() => startGame(room.id)}
+                  disabled={room.status === "finished"}
+                >
+                  <Play className="h-4 w-4" />
+                  {room.status === "playing" ? "Abrir partida" : "Iniciar partida"}
                 </Button>
                 </CardContent>
               </Card>

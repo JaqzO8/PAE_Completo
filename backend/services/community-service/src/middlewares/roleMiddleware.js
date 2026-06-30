@@ -39,7 +39,7 @@ const verifyTeacherOfCommunity = async (req, res, next) => {
             });
         }
 
-        if (community.profesor_id !== userId && req.user.rol !== 'admin') {
+        if (String(community.profesor_id) !== String(userId) && req.user.rol !== 'admin') {
             return res.status(403).json({
                 success: false,
                 message: 'Solo el profesor creador puede realizar esta acción',
