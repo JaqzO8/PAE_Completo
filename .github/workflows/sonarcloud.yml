@@ -53,10 +53,10 @@ jobs:
             -Dsonar.organization=jaqzo8
             -Dsonar.projectKey=JaqzO8_PAE_Completo
             -Dsonar.projectName=PAE_Completo
-            -Dsonar.sources=backend/services/exam-service/src/services
-            -Dsonar.inclusions=backend/services/exam-service/src/services/liveAnswerRules.js
+            -Dsonar.sources=backend/services/exam-service/src/services,sonar-evidence
+            -Dsonar.inclusions=backend/services/exam-service/src/services/liveAnswerRules.js,sonar-evidence/security-risk-fixture.js
             -Dsonar.tests=backend/services/exam-service/src/tests
             -Dsonar.test.inclusions=backend/services/exam-service/src/tests/**/*.test.js
             -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
-            -Dsonar.coverage.exclusions=backend/services/exam-service/src/services/achievementService.js,backend/services/exam-service/src/services/gamificationService.js
+            -Dsonar.coverage.exclusions=backend/services/exam-service/src/services/achievementService.js,backend/services/exam-service/src/services/gamificationService.js,sonar-evidence/**
             -Dsonar.exclusions=**/node_modules/**,**/coverage/**,**/dist/**,**/uploads/**
