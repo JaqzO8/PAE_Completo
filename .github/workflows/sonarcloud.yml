@@ -1,4 +1,4 @@
-name: SonarCloud analysis with coverage
+name: SonarCloud Analysis
 
 on:
   push:
@@ -9,70 +9,66 @@ on:
       - main
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pull-requests: read
-
 jobs:
-  Analysis:
+  sonarcloud:
+    name: Build, Test and Analyze
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # FRONTEND: React + Vite
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: 20
           cache: npm
-          cache-dependency-path: apps/web/package-lock.json
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+            backend/services/content-service/package-lock.json
+            backend/services/exam-service/package-lock.json
 
-      - name: Install frontend dependencies
-        working-directory: apps/web
+      - name: Install root dependencies
         run: npm ci
 
-      - name: Run frontend tests with coverage
-        working-directory: apps/web
-        run: npx vitest run --coverage --coverage.reporter=lcov
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
 
-      # BACKEND: FastAPI + Python
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
 
-      - name: Install backend dependencies
-        working-directory: services/api
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest pytest-cov
+      - name: Install content-service dependencies
+        working-directory: backend/services/content-service
+        run: npm ci
 
-      - name: Run backend tests with coverage
-        working-directory: services/api
-        run: |
-          pytest tests \
-            --cov=app \
-            --cov-branch \
-            --cov-report=xml:coverage.xml
+      - name: Run content-service tests with coverage
+        working-directory: backend/services/content-service
+        run: npm test -- --coverage --runInBand
+
+      - name: Run exam-service condition coverage tests
+        run: npx jest backend/services/exam-service/src/tests/liveAnswerRules.conditionCoverage.test.js --runInBand --verbose --no-color -t "test_c1"
 
       - name: Verify coverage files
         run: |
-          test -f apps/web/coverage/lcov.info
-          test -f services/api/coverage.xml
+          test -f backend/services/content-service/coverage/lcov.info
+          echo "Coverage file found."
 
       - name: Analyze with SonarCloud
-        uses: SonarSource/sonarqube-scan-action@v7
+        uses: SonarSource/sonarqube-scan-action@v5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           args: >
-            -Dsonar.projectKey=JaqzO8_PAE_Completo
             -Dsonar.organization=jaqzo8
-            -Dsonar.javascript.lcov.reportPaths=apps/web/coverage/lcov.info
-            -Dsonar.python.coverage.reportPaths=services/api/coverage.xml
-            -Dsonar.host.url=https://sonarcloud.io
+            -Dsonar.projectKey=JaqzO8_PAE_Completo
+            -Dsonar.projectName=PAE_Completo
+            -Dsonar.sources=frontend/src,backend/services
+            -Dsonar.tests=backend/services/content-service/src/tests,backend/services/exam-service/src/tests
+            -Dsonar.javascript.lcov.reportPaths=backend/services/content-service/coverage/lcov.info
+            -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/coverage/**,**/uploads/**,**/*.html
+            -Dsonar.test.inclusions=**/*.test.js,**/*.spec.js
