@@ -30,6 +30,6 @@ jobs:
         with:
           args: >
             -Dsonar.projectKey=JaqzO8_PAE_Completo
-            -Dsonar.organization=jaqz08
+            -Dsonar.organization=jaqzo8
             -Dsonar.host.url=https://sonarcloud.io
           projectBaseDir: .
