@@ -1,5 +1,7 @@
-const CACHE_NAME = "pae-app-shell-v1";
-const APP_SHELL = ["/", "/index.html"];
+const CACHE_NAME = "pae-app-shell-v2";
+const BASE_PATH = new URL(self.registration.scope).pathname;
+const INDEX_PATH = `${BASE_PATH}index.html`;
+const APP_SHELL = [BASE_PATH, INDEX_PATH];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -23,7 +25,7 @@ self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);
 
-  if (request.method !== "GET" || url.pathname.startsWith("/api/")) {
+  if (request.method !== "GET" || url.pathname.startsWith(`${BASE_PATH}api/`)) {
     return;
   }
 
@@ -32,10 +34,10 @@ self.addEventListener("fetch", (event) => {
       fetch(request)
         .then((response) => {
           const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put("/index.html", copy));
+          caches.open(CACHE_NAME).then((cache) => cache.put(INDEX_PATH, copy));
           return response;
         })
-        .catch(() => caches.match("/index.html"))
+        .catch(() => caches.match(INDEX_PATH))
     );
     return;
   }
