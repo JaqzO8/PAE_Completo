@@ -73,7 +73,7 @@ const OfflineAttemptSync = () => {
 
 export const AppRouter = () => {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <AuthProvider>
         <AppearanceProvider>
         <OfflineAttemptSync />

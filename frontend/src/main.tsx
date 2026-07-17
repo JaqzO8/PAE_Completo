@@ -12,7 +12,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/pae-sw.js').catch((error) => {
+    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}pae-sw.js`).catch((error) => {
       console.warn('No se pudo registrar el soporte offline de PAE.', error);
     });
   });
