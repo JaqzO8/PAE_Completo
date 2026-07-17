@@ -38,6 +38,11 @@ docker compose -f docker-compose.yml -f docker-compose.demo.yml logs demo-tunnel
 Buscar la direccion terminada en `trycloudflare.com`. La URL es temporal y
 cambia al recrear el contenedor `demo-tunnel`.
 
+Para consumir el backend desde un frontend alojado en otro dominio, establecer
+`PUBLIC_FRONTEND_ORIGIN` y `FRONTEND_URL` con su origen, sin ruta final. Por
+ejemplo, una URL `https://usuario.github.io/proyecto/` usa el origen
+`https://usuario.github.io`.
+
 ## Detener la demostracion
 
 ```powershell
